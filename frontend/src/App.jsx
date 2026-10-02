@@ -4,7 +4,9 @@ import DoctorLayout from "./layouts/DoctorLayout";
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
 import MyPatients from "./pages/doctor/MyPatients";
 import PatientWorkspace from "./pages/doctor/PatientWorkspace";
-import EmptyState from "./components/doctor/EmptyState";
+import MedicalRecords from "./pages/doctor/MedicalRecords";
+import Consultations from "./pages/doctor/Consultations";
+import Prescriptions from "./pages/doctor/Prescriptions";
 
 export default function App() {
     return (
@@ -21,38 +23,11 @@ export default function App() {
 
                     <Route path="patients/:patientId" element={<PatientWorkspace />} />
 
-                    <Route
-                        path="records"
-                        element={
-                            <EmptyState
-                                icon="folder_shared"
-                                title="Medical Records"
-                                description="Authorized patient medical records will be available here."
-                            />
-                        }
-                    />
+                    <Route path="records" element={<MedicalRecords />} />
 
-                    <Route
-                        path="consultations"
-                        element={
-                            <EmptyState
-                                icon="edit_note"
-                                title="Consultations"
-                                description="Create and manage patient consultation records here."
-                            />
-                        }
-                    />
+                    <Route path="consultations" element={<Consultations />} />
 
-                    <Route
-                        path="prescriptions"
-                        element={
-                            <EmptyState
-                                icon="prescriptions"
-                                title="Prescriptions"
-                                description="Create and manage prescriptions for your consultations here."
-                            />
-                        }
-                    />
+                    <Route path="prescriptions" element={<Prescriptions />} />
 
                 </Route>
 

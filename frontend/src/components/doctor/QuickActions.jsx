@@ -5,7 +5,7 @@ const actions = [
     { label: "Start Consultation", icon: "add_call", to: "/doctor/consultations", primary: true },
     { label: "View Medical Records", icon: "folder_shared", to: "/doctor/records", iconTone: "text-primary" },
     { label: "Create Prescription", icon: "prescriptions", to: "/doctor/prescriptions", iconTone: "text-secondary" },
-    { label: "Upload / Review Report", icon: "upload_file", to: "/doctor/records", iconTone: "text-tertiary" },
+    { label: "Review Reports", icon: "lab_profile", to: "/doctor/records", iconTone: "text-tertiary" },
 ];
 
 export default function QuickActions() {
