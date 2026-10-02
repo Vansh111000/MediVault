@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import StatusBadge from "./StatusBadge";
-import ConsentCell from "./ConsentCell";
 import Icon from "../Icon";
 
 const INITIAL_VISIBLE = 5;
@@ -118,7 +117,6 @@ export default function PatientQueue({ patients }) {
                             <th className="py-3 px-3">Patient ID</th>
                             <th className="py-3 px-3">Appointment</th>
                             <th className="py-3 px-3">Visit Type</th>
-                            <th className="py-3 px-3">Record Access</th>
                             <th className="py-3 px-3">Status</th>
                             <th className="py-3 px-4 rounded-r-xl text-right">Actions</th>
                         </tr>
@@ -126,7 +124,7 @@ export default function PatientQueue({ patients }) {
                     <tbody className="divide-y divide-surface-container">
                         {visible.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="py-10 text-center text-on-surface-variant">
+                                <td colSpan={6} className="py-10 text-center text-on-surface-variant">
                                     No patients match your search.
                                 </td>
                             </tr>
@@ -199,10 +197,6 @@ export default function PatientQueue({ patients }) {
                                         >
                                             {patient.visitType}
                                         </span>
-                                    </td>
-
-                                    <td className="py-3.5 px-3">
-                                        <ConsentCell consent={patient.consent} />
                                     </td>
 
                                     <td className="py-3.5 px-3">

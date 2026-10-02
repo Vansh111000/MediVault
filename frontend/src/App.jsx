@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import DoctorLayout from "./layouts/DoctorLayout";
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import MyPatients from "./pages/doctor/MyPatients";
+import PatientWorkspace from "./pages/doctor/PatientWorkspace";
 import EmptyState from "./components/doctor/EmptyState";
 
 export default function App() {
@@ -15,27 +17,9 @@ export default function App() {
 
                     <Route index element={<DoctorDashboard />} />
 
-                    <Route
-                        path="patients"
-                        element={
-                            <EmptyState
-                                icon="group"
-                                title="My Patients"
-                                description="Your assigned patients and their consultation history will appear here."
-                            />
-                        }
-                    />
+                    <Route path="patients" element={<MyPatients />} />
 
-                    <Route
-                        path="patients/:patientId"
-                        element={
-                            <EmptyState
-                                icon="folder_shared"
-                                title="Patient Workspace"
-                                description="Patient records, consultation history and clinical information will appear here."
-                            />
-                        }
-                    />
+                    <Route path="patients/:patientId" element={<PatientWorkspace />} />
 
                     <Route
                         path="records"
