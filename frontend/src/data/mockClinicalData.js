@@ -1,9 +1,3 @@
-// Temporary mock clinical data for the Medical Records, Consultations and
-// Prescriptions pages. Patients themselves come from mockDoctorData.js.
-// Replace with API calls once the backend exists.
-
-// ---------- Small helpers ----------
-
 // Today's date as YYYY-MM-DD in the user's local time zone.
 export function todayISO() {
     const d = new Date();
@@ -69,7 +63,6 @@ export const medicalRecords = {
         rec("prescription", "Furosemide 40mg, once daily", "2026-09-18", "Take in the morning.", "MediVault Clinic"),
         rec("report", "Chest X-ray", "2026-09-17", "No acute changes.", "MediVault Clinic"),
     ],
-    // MV-11590 (new patient) intentionally has no records.
 };
 
 // ---------- Consultations ----------
@@ -142,3 +135,17 @@ export const initialPrescriptions = [
         date: "2026-08-30",
     },
 ];
+
+// ---------- Allergy details ----------
+// The patients array only has hasAllergy (true/false); this adds a display name.
+export const allergyNotes = {
+    "MV-10482": "Penicillin",
+    "MV-07761": "Sulfa drugs",
+};
+
+// "Allergy: Penicillin" / "Allergy on record" / null (no allergy)
+export function getAllergyLabel(patient) {
+    if (!patient.hasAllergy) return null;
+    const note = allergyNotes[patient.id];
+    return note ? `Allergy: ${note}` : "Allergy on record";
+}

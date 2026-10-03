@@ -2,9 +2,8 @@ import { Link } from "react-router-dom";
 import Icon from "../Icon";
 
 const actions = [
-    { label: "Start Consultation", icon: "add_call", to: "/doctor/consultations", primary: true },
+    { label: "Start Consultation", icon: "add_call", to: "/doctor/patients", primary: true },
     { label: "View Medical Records", icon: "folder_shared", to: "/doctor/records", iconTone: "text-primary" },
-    { label: "Create Prescription", icon: "prescriptions", to: "/doctor/prescriptions", iconTone: "text-secondary" },
     { label: "Review Reports", icon: "lab_profile", to: "/doctor/records", iconTone: "text-tertiary" },
 ];
 

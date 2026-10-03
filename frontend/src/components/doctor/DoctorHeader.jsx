@@ -6,8 +6,6 @@ const navItems = [
     { label: "Dashboard", to: "/doctor", end: true },
     { label: "My Patients", to: "/doctor/patients" },
     { label: "Medical Records", to: "/doctor/records" },
-    { label: "Consultations", to: "/doctor/consultations" },
-    { label: "Prescriptions", to: "/doctor/prescriptions" },
 ];
 
 const navClass = ({ isActive }) =>
