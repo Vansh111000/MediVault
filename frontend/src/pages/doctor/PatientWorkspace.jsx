@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import StatusBadge from "../../components/doctor/StatusBadge";
 import { patients } from "../../data/mockDoctorData";
-import { FREQUENCIES, getAllergyLabel } from "../../data/mockClinicalData";
+import { FREQUENCIES, getAllergyLabel, getBodyMeasurements } from "../../data/mockClinicalData";
 
 const tabs = [
     { label: "Medical Records", to: "records", icon: "folder_shared" },
@@ -66,6 +66,14 @@ function WorkspaceBody({ patient }) {
     const [newPrescriptions, setNewPrescriptions] = useState([]);
 
     const allergyLabel = getAllergyLabel(patient);
+    const { height, weight } = getBodyMeasurements(patient);
+    const profileDetails = [
+        { label: "Age", value: `${patient.age} yrs` },
+        { label: "Sex", value: patient.sex },
+        { label: "Height", value: height },
+        { label: "Weight", value: weight },
+        { label: "Blood Group", value: patient.bloodGroup },
+    ];
 
     const context = {
         patient,
@@ -100,9 +108,16 @@ function WorkspaceBody({ patient }) {
                                     {patient.id}
                                 </span>
                             </div>
-                            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-                                {patient.age} yrs • {patient.sex} • Blood group {patient.bloodGroup}
-                            </p>
+                            <dl className="flex flex-wrap items-baseline gap-x-space-lg gap-y-1 mt-1.5">
+                                {profileDetails.map(({ label, value }) => (
+                                    <div key={label} className="flex items-baseline gap-1">
+                                        <dt className="font-body-sm text-body-sm text-outline">{label}:</dt>
+                                        <dd className="font-body-sm text-body-sm text-on-surface-variant font-medium">
+                                            {value}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
                         </div>
                     </div>
 

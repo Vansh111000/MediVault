@@ -149,3 +149,23 @@ export function getAllergyLabel(patient) {
     const note = allergyNotes[patient.id];
     return note ? `Allergy: ${note}` : "Allergy on record";
 }
+
+// ---------- Body measurements ----------
+export const bodyMeasurements = {
+    "MV-10482": { heightCm: 178, weightKg: 82 },
+    "MV-10831": { heightCm: 160, weightKg: 54 },
+    "MV-09217": { heightCm: 170, weightKg: 76 },
+    "MV-11204": { heightCm: 163, weightKg: 62 },
+    "MV-08943": { heightCm: 175, weightKg: 80 },
+    "MV-11377": { heightCm: 158, weightKg: 60 },
+    "MV-11590": { heightCm: 172, weightKg: 74 },
+    "MV-07761": { heightCm: 172, weightKg: 78 },
+};
+
+export function getBodyMeasurements(patient) {
+    const m = bodyMeasurements[patient.id];
+    return {
+        height: m ? `${m.heightCm} cm` : "—",
+        weight: m ? `${m.weightKg} kg` : "—",
+    };
+}
