@@ -195,9 +195,9 @@ function buildSummary(patient, allergyLabel) {
 
 function Block({ title, children }) {
     return (
-        <div className="p-space-sm bg-surface-container-lowest rounded-xl space-y-1.5">
+        <div className="p-3.5 bg-white rounded-xl border border-slate-200/70 shadow-2xs space-y-1.5">
             <div>
-                <h4 className="font-label-md text-label-md text-on-surface font-bold">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                     {title}
                 </h4>
             </div>
@@ -208,7 +208,7 @@ function Block({ title, children }) {
 }
 
 const emptyLine = (text) => (
-    <p className="font-body-sm text-body-sm text-on-surface-variant">
+    <p className="text-xs text-slate-400 font-medium">
         {text}
     </p>
 );
@@ -218,10 +218,11 @@ export default function AISummaryCard({ patient, allergyLabel }) {
     const s = buildSummary(patient, allergyLabel);
 
     return (
-        <div className="bg-surface-container-low rounded-2xl p-space-md space-y-space-sm">
-            <div className="flex items-center justify-between gap-space-sm">
-                <div>
-                    <h3 className="font-title-md text-title-md text-on-surface font-bold">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-4 sm:p-5 space-y-3">
+            <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-200/60">
+                <div className="flex items-center gap-2">
+                    <Icon className="text-teal-700 text-[20px]">auto_awesome</Icon>
+                    <h3 className="text-sm font-bold text-slate-900">
                         AI Medical History Summary
                     </h3>
                 </div>
@@ -230,7 +231,7 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                     type="button"
                     onClick={() => setOpen((v) => !v)}
                     aria-expanded={open}
-                    className="inline-flex items-center gap-1 font-label-sm text-label-sm text-primary font-semibold hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-800 transition-colors"
                 >
                     {open ? "Hide summary" : "Show summary"}
 
@@ -244,19 +245,19 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                 <>
                     {/* Overview */}
                     <Block title="Overview">
-                        <p className="font-body-md text-body-md text-on-surface">
+                        <p className="text-xs text-slate-800 leading-relaxed font-medium">
                             {s.overview}
                         </p>
 
-                        <p className="font-body-sm text-body-sm text-on-surface-variant">
-                            <span className="text-outline">
+                        <p className="text-xs text-slate-500 pt-1">
+                            <span className="font-semibold text-slate-400">
                                 Allergies:
                             </span>{" "}
                             <span
                                 className={
                                     allergyLabel
-                                        ? "text-error font-semibold"
-                                        : "font-medium"
+                                        ? "text-rose-600 font-bold"
+                                        : "font-semibold text-slate-700"
                                 }
                             >
                                 {s.allergies}
@@ -265,7 +266,7 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                     </Block>
 
                     {s.hasRecords && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-sm items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
                             <Block title="Key Conditions">
                                 {s.conditions.length === 0 ? (
                                     emptyLine("No diagnoses on record.")
@@ -274,14 +275,11 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                                         {s.conditions.map((c) => (
                                             <li
                                                 key={c.name}
-                                                className="font-body-md text-body-md text-on-surface"
+                                                className="text-xs text-slate-800 font-medium"
                                             >
-                                                {c.name}
-
-                                                <span className="font-body-sm text-body-sm text-outline">
-                                                    {" "}
-                                                    • last recorded{" "}
-                                                    {formatDate(c.date)}
+                                                <span className="font-semibold">{c.name}</span>
+                                                <span className="text-[11px] text-slate-400">
+                                                    {" "}• last recorded {formatDate(c.date)}
                                                 </span>
                                             </li>
                                         ))}
@@ -299,15 +297,13 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                                         {s.medications.map((m) => (
                                             <li
                                                 key={m.key}
-                                                className="font-body-md text-body-md text-on-surface"
+                                                className="text-xs text-slate-800"
                                             >
-                                                <span className="font-semibold">
+                                                <span className="font-semibold text-slate-900">
                                                     {m.name}
                                                 </span>
-
-                                                <span className="font-body-sm text-body-sm text-on-surface-variant">
-                                                    {" "}
-                                                    • {m.detail}
+                                                <span className="text-[11px] text-slate-500 font-medium">
+                                                    {" "}• {m.detail}
                                                 </span>
                                             </li>
                                         ))}
@@ -322,7 +318,7 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                                     <ul className="space-y-1.5">
                                         {s.findings.map((f) => (
                                             <li key={f.key}>
-                                                <span className="font-body-md text-body-md text-on-surface">
+                                                <span className="text-xs text-slate-700 leading-relaxed font-medium">
                                                     {f.text}
                                                 </span>
                                             </li>
@@ -340,11 +336,10 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                                     <ul className="space-y-1.5">
                                         {s.history.map((h) => (
                                             <li key={h.key}>
-                                                <span className="block font-label-md text-label-md text-on-surface font-semibold">
+                                                <span className="block text-xs text-slate-900 font-bold">
                                                     {h.title}
                                                 </span>
-
-                                                <span className="block font-body-sm text-body-sm text-on-surface-variant">
+                                                <span className="block text-[11px] text-slate-500 font-medium">
                                                     {h.detail}
                                                 </span>
                                             </li>
@@ -356,18 +351,18 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                     )}
 
                     {/* Things to review */}
-                    <div className="p-space-md bg-secondary/10 rounded-xl space-y-space-sm">
-                        <div className="text-secondary">
-                            <h4 className="font-label-md text-label-md font-bold">
+                    <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1.5">
+                        <div className="text-amber-800">
+                            <h4 className="text-xs font-bold uppercase tracking-wider">
                                 Things to Review
                             </h4>
                         </div>
 
-                        <ul className="space-y-1 list-disc pl-space-lg marker:text-secondary">
+                        <ul className="space-y-1 list-disc pl-5 marker:text-amber-600">
                             {s.review.map((item) => (
                                 <li
                                     key={item}
-                                    className="font-body-md text-body-md text-on-surface"
+                                    className="text-xs text-amber-950 font-medium"
                                 >
                                     {item}
                                 </li>
@@ -375,8 +370,8 @@ export default function AISummaryCard({ patient, allergyLabel }) {
                         </ul>
                     </div>
 
-                    <p className="flex items-start gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
-                        <Icon className="!text-[14px] !leading-[14px] mt-px">
+                    <p className="flex items-start gap-1.5 text-[11px] text-slate-400 font-medium pt-1">
+                        <Icon className="!text-[14px] !leading-[14px] mt-px text-slate-400">
                             info
                         </Icon>
                         AI-generated summary. Verify information against the original medical records.

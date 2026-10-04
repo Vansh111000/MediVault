@@ -1,13 +1,13 @@
 import { Outlet } from "react-router-dom";
 import DoctorHeader from "../components/doctor/DoctorHeader";
-import Footer from "../components/Footer";
+import { Footer } from "../components/Shared/Footer";
 
 export default function DoctorLayout() {
     return (
-        <div className="min-h-screen flex flex-col bg-surface font-body-md text-body-md text-on-surface antialiased">
+        <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-900 font-sans antialiased">
             <DoctorHeader />
 
-            <main className="flex-1 w-full bg-surface">
+            <main className="flex-1 w-full bg-[#f8fafc]">
                 <Outlet />
             </main>
 

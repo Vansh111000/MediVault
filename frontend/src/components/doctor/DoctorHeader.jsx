@@ -1,5 +1,5 @@
 import { Link, NavLink } from "react-router-dom";
-import Icon from "../Icon";
+import { Shield, ArrowLeft, Bell } from "lucide-react";
 import { doctor, liveFeed } from "../../data/mockDoctorData";
 
 const navItems = [
@@ -8,37 +8,41 @@ const navItems = [
     { label: "Medical Records", to: "/doctor/records" },
 ];
 
-const navClass = ({ isActive }) =>
-    `whitespace-nowrap px-space-md py-space-sm rounded-lg font-label-md text-label-md transition-colors ${
-        isActive
-            ? "bg-primary-container text-on-primary-container font-semibold shadow-sm"
-            : "text-on-surface-variant hover:text-on-surface"
-    }`;
-
 export default function DoctorHeader() {
     const unreadCount = liveFeed.filter((item) => item.unread).length;
 
+    const navClass = ({ isActive }) =>
+        `whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            isActive
+                ? "bg-teal-700 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+        }`;
+
     return (
-        <header className="sticky top-0 z-50 bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-            <div className="h-20 w-full px-margin-mobile sm:px-margin flex items-center justify-between gap-gutter">
-                <div className="flex items-center gap-space-lg">
-                    <Link to="/doctor" className="flex items-center gap-space-sm select-none">
-                        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-[0_2px_6px_rgba(0,104,95,0.2)]">
-                            <Icon className="text-on-primary text-[24px]">verified_user</Icon>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="font-title-md text-title-md text-on-surface tracking-tight leading-none font-bold">
-                                MediVault
-                            </span>
-                            <span className="font-label-sm text-label-sm text-primary tracking-wider uppercase mt-space-xs">
-                                Doctor Portal
-                            </span>
-                        </div>
+        <header className="sticky top-0 z-40 bg-[#f8fafc] border-b border-slate-200/80 shadow-xs">
+            <div className="w-full px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <Link
+                        to="/"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-teal-700 transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        <span className="hidden sm:inline">Home</span>
                     </Link>
 
+                    <Link to="/doctor" className="flex items-center gap-2 select-none">
+                        <div className="w-8 h-8 rounded-xl bg-teal-700 flex items-center justify-center text-white shadow-xs">
+                            <Shield className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <span className="font-bold text-slate-900 block leading-tight">MediVault</span>
+                            <span className="text-[10px] font-semibold text-teal-700 uppercase tracking-wider">DOCTOR PORTAL</span>
+                        </div>
+                    </Link>
                 </div>
 
-                <nav className="hidden lg:flex items-center gap-1.5 p-1 bg-surface-container-low rounded-xl">
+                {/* Desktop Navigation */}
+                <nav className="hidden md:flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/60">
                     {navItems.map((item) => (
                         <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
                             {item.label}
@@ -46,49 +50,58 @@ export default function DoctorHeader() {
                     ))}
                 </nav>
 
-                <div className="flex items-center gap-space-md">
-
+                {/* Right Profile & Actions */}
+                <div className="flex items-center gap-3">
                     <button
                         type="button"
                         aria-label="Notifications"
-                        className="relative p-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors"
+                        className="relative p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors shadow-xs"
                     >
-                        <Icon className="text-[22px]">notifications</Icon>
+                        <Bell className="w-4 h-4" />
                         {unreadCount > 0 && (
-                            <span className="absolute top-1 right-1 w-4 h-4 bg-error text-on-error rounded-full text-[10px] leading-none flex items-center justify-center font-bold">
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-teal-700 text-white rounded-full text-[10px] leading-none flex items-center justify-center font-bold">
                                 {unreadCount}
                             </span>
                         )}
                     </button>
 
-                    <div className="flex items-center gap-space-sm pl-space-xs">
-                        <div className="hidden sm:flex flex-col text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                                <span className="font-label-md text-label-md text-on-surface font-semibold">
-                                    {doctor.name}
-                                </span>
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-800 font-extrabold flex items-center justify-center text-xs border border-slate-200">
+                            {doctor.shortName ? doctor.shortName.replace('Dr. ', '').split(' ').map((n) => n[0]).join('') : 'DR'}
+                        </div>
+                        <div className="hidden sm:block text-left text-xs">
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-900">{doctor.name}</span>
                                 {doctor.onDuty && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-tertiary-container/15 text-tertiary text-[10px] font-bold">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                                         On Duty
                                     </span>
                                 )}
                             </div>
-                            <span className="font-label-sm text-label-sm text-on-surface-variant">
-                                {doctor.specialty} • {doctor.role}
+                            <span className="text-[11px] text-slate-500 font-medium">
+                                {doctor.specialty} • {doctor.hospital}
                             </span>
-                        </div>
-                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                            <Icon className="text-on-primary text-[18px]">person</Icon>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Mobile / tablet navigation */}
-            <nav className="lg:hidden flex items-center gap-1.5 overflow-x-auto px-margin-mobile sm:px-margin pb-space-sm">
+            {/* Mobile navigation */}
+            <nav className="md:hidden flex items-center gap-1.5 overflow-x-auto px-4 sm:px-6 py-2 border-t border-slate-200/60 bg-[#f8fafc]">
                 {navItems.map((item) => (
-                    <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
+                    <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.end}
+                        className={({ isActive }) =>
+                            `whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                isActive
+                                    ? "bg-teal-700 text-white shadow-xs"
+                                    : "text-slate-600 hover:text-slate-900 bg-white border border-slate-200/80"
+                            }`
+                        }
+                    >
                         {item.label}
                     </NavLink>
                 ))}

@@ -6,17 +6,17 @@ import Icon from "../Icon";
 const INITIAL_VISIBLE = 5;
 
 const avatarTones = [
-    "bg-primary-container text-on-primary-container",
-    "bg-secondary-container text-on-secondary-container",
-    "bg-surface-container-highest text-on-surface",
-    "bg-tertiary/20 text-tertiary",
+    "bg-teal-50 text-teal-700 border border-teal-200/60",
+    "bg-sky-50 text-sky-700 border border-sky-200/60",
+    "bg-emerald-50 text-emerald-700 border border-emerald-200/60",
+    "bg-indigo-50 text-indigo-700 border border-indigo-200/60",
 ];
 
 const visitTypeTones = {
-    "Follow-up": "bg-surface-container-high text-on-surface-variant",
-    "New Consultation": "bg-secondary/10 text-secondary font-medium",
-    "Specialist Review": "bg-tertiary/10 text-tertiary font-medium",
-    "Lab Review": "bg-surface-container text-outline",
+    "Follow-up": "bg-slate-100 text-slate-700 border border-slate-200/60",
+    "New Consultation": "bg-sky-50 text-sky-700 border border-sky-200/60 font-semibold",
+    "Specialist Review": "bg-teal-50 text-teal-700 border border-teal-200/60 font-semibold",
+    "Lab Review": "bg-amber-50 text-amber-700 border border-amber-200/60 font-semibold",
 };
 
 const FILTERS = ["all", "waiting", "checked-in", "in-room", "upcoming", "completed"];
@@ -64,29 +64,29 @@ export default function PatientQueue({ patients }) {
     const hiddenCount = matches.length - visible.length;
 
     return (
-        <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-space-lg space-y-space-md">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-sm">
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
                 <div>
-                    <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Today's Patients</h2>
-                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    <h2 className="text-lg font-bold text-slate-900">Today's Patients</h2>
+                    <p className="text-xs text-slate-500 font-medium">
                         Patients assigned to you for consultation by the hospital assistant.
                     </p>
                 </div>
-                <span className="self-start font-label-sm text-label-sm px-2.5 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+                <span className="self-start px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200/60 text-[11px] font-bold">
                     Assigned by reception
                 </span>
             </div>
 
             {/* Search & filters */}
-            <div className="flex flex-col md:flex-row md:items-center gap-space-sm">
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
                 <div className="relative flex-1">
-                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</Icon>
+                    <Icon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</Icon>
                     <input
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search your patients by name or Patient ID..."
-                        className="w-full pl-9 pr-4 py-2 bg-surface-container-low text-on-surface rounded-xl font-body-md text-body-md placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:border-teal-700 font-medium transition-all"
                     />
                 </div>
 
@@ -96,10 +96,10 @@ export default function PatientQueue({ patients }) {
                             key={key}
                             type="button"
                             onClick={() => setFilter(key)}
-                            className={`px-3 py-1.5 rounded-lg font-label-sm text-label-sm transition-colors ${
+                            className={`px-3 py-1.5 rounded-xl text-xs transition-all ${
                                 filter === key
-                                    ? "bg-primary text-on-primary font-semibold"
-                                    : "bg-surface-container-low hover:bg-surface-container text-on-surface-variant"
+                                    ? "bg-teal-700 text-white font-bold shadow-xs"
+                                    : "bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-semibold"
                             }`}
                         >
                             {FILTER_LABELS[key]} ({counts[key]})
@@ -109,22 +109,22 @@ export default function PatientQueue({ patients }) {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-left font-body-md text-body-md border-collapse">
+            <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+                <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                        <tr className="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm">
-                            <th className="py-3 px-4 rounded-l-xl">Patient</th>
+                        <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200/80">
+                            <th className="py-3 px-4">Patient</th>
                             <th className="py-3 px-3">Patient ID</th>
                             <th className="py-3 px-3">Appointment</th>
                             <th className="py-3 px-3">Visit Type</th>
                             <th className="py-3 px-3">Status</th>
-                            <th className="py-3 px-4 rounded-r-xl text-right">Actions</th>
+                            <th className="py-3 px-4 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-surface-container">
+                    <tbody className="divide-y divide-slate-100">
                         {visible.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="py-10 text-center text-on-surface-variant">
+                                <td colSpan={6} className="py-10 text-center text-slate-400 font-medium">
                                     No patients match your search.
                                 </td>
                             </tr>
@@ -133,31 +133,31 @@ export default function PatientQueue({ patients }) {
                         {visible.map((patient, index) => {
                             const done = patient.status === "completed";
                             const avatar = done
-                                ? "bg-surface-container-low text-on-surface-variant"
+                                ? "bg-slate-100 text-slate-500 border border-slate-200"
                                 : avatarTones[index % avatarTones.length];
 
                             return (
-                                <tr key={patient.id} className="hover:bg-surface-container-low/50 transition-colors">
-                                    <td className="py-3.5 px-4">
+                                <tr key={patient.id} className="hover:bg-slate-50/70 transition-colors">
+                                    <td className="py-3 px-4">
                                         <div className="flex items-center gap-3">
                                             <div
-                                                className={`w-9 h-9 rounded-full font-semibold flex items-center justify-center font-label-md text-label-md ${avatar}`}
+                                                className={`w-9 h-9 rounded-full font-bold flex items-center justify-center text-xs shrink-0 ${avatar}`}
                                             >
                                                 {initials(patient.name)}
                                             </div>
                                             <div>
-                                                <div className="font-title-md text-title-md font-semibold flex items-center gap-1.5">
-                                                    <span className={done ? "line-through text-outline" : "text-on-surface"}>
+                                                <div className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                                                    <span className={done ? "line-through text-slate-400" : "text-slate-900"}>
                                                         {patient.name}
                                                     </span>
                                                     {patient.hasAllergy && (
                                                         <span
-                                                            className="w-2 h-2 rounded-full bg-error"
+                                                            className="w-2 h-2 rounded-full bg-rose-500"
                                                             title="Allergy notice active"
                                                         />
                                                     )}
                                                 </div>
-                                                <span className="font-body-sm text-body-sm text-on-surface-variant">
+                                                <span className="text-[11px] text-slate-500 font-medium">
                                                     {patient.age} yrs • {patient.sex} • {patient.bloodGroup}
                                                 </span>
                                             </div>
@@ -165,33 +165,33 @@ export default function PatientQueue({ patients }) {
                                     </td>
 
                                     <td
-                                        className={`py-3.5 px-3 font-label-sm text-label-sm font-semibold ${
-                                            done ? "text-on-surface-variant" : "text-on-surface"
+                                        className={`py-3 px-3 font-semibold text-xs ${
+                                            done ? "text-slate-400" : "text-slate-900 font-mono"
                                         }`}
                                     >
                                         {patient.id}
                                     </td>
 
-                                    <td className="py-3.5 px-3">
+                                    <td className="py-3 px-3">
                                         <span
-                                            className={`font-label-sm text-label-sm font-semibold ${
-                                                done ? "text-outline" : "text-on-surface"
+                                            className={`font-semibold block ${
+                                                done ? "text-slate-400" : "text-slate-900"
                                             }`}
                                         >
                                             {patient.time}
                                         </span>
                                         <span
-                                            className={`block font-body-sm text-body-sm ${
-                                                done ? "text-outline" : "text-on-surface-variant"
+                                            className={`block text-[11px] ${
+                                                done ? "text-slate-400" : "text-slate-500"
                                             }`}
                                         >
                                             {patient.location}
                                         </span>
                                     </td>
 
-                                    <td className="py-3.5 px-3">
+                                    <td className="py-3 px-3">
                                         <span
-                                            className={`px-2 py-0.5 rounded-md font-label-sm text-label-sm ${
+                                            className={`px-2 py-0.5 rounded-md text-[11px] ${
                                                 visitTypeTones[patient.visitType] ?? visitTypeTones["Follow-up"]
                                             }`}
                                         >
@@ -199,19 +199,19 @@ export default function PatientQueue({ patients }) {
                                         </span>
                                     </td>
 
-                                    <td className="py-3.5 px-3">
+                                    <td className="py-3 px-3">
                                         <StatusBadge status={patient.status} />
                                     </td>
 
-                                    <td className="py-3.5 px-4 text-right">
+                                    <td className="py-3 px-4 text-right">
                                         <Link
                                             to={`/doctor/patients/${patient.id}`}
-                                            className={`inline-block px-3 py-1.5 rounded-lg font-label-sm text-label-sm transition-colors ${
+                                            className={`inline-block whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                                                 patient.status === "waiting"
-                                                    ? "bg-primary text-on-primary font-semibold hover:bg-primary-container shadow-sm"
+                                                    ? "bg-teal-700 hover:bg-teal-800 text-white shadow-xs"
                                                     : done
-                                                      ? "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
-                                                      : "bg-surface-container-high text-on-surface font-semibold hover:bg-surface-container-highest"
+                                                      ? "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-xs"
+                                                      : "bg-white hover:bg-slate-50 text-teal-700 border border-teal-200 shadow-xs"
                                             }`}
                                         >
                                             {patient.status === "waiting" ? "Open Vault" : done ? "Summary" : "View"}
@@ -224,7 +224,7 @@ export default function PatientQueue({ patients }) {
                 </table>
             </div>
 
-            <div className="flex items-center justify-between pt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+            <div className="flex items-center justify-between pt-1 text-xs text-slate-500">
                 <span>
                     Showing {visible.length} of {isNarrowed ? matches.length : patients.length} consultations
                 </span>
@@ -232,7 +232,7 @@ export default function PatientQueue({ patients }) {
                     <button
                         type="button"
                         onClick={() => setShowAll(true)}
-                        className="text-primary hover:underline font-semibold"
+                        className="text-teal-700 hover:text-teal-800 font-bold hover:underline"
                     >
                         Load remaining {hiddenCount}
                     </button>

@@ -7,24 +7,26 @@ import { doctor } from "../../../data/mockDoctorData";
 import { todayISO, formatDate } from "../../../data/mockClinicalData";
 
 const inputClass = (error) =>
-    `w-full px-3 py-2 bg-surface-container-low text-on-surface rounded-xl font-body-md text-body-md placeholder:text-outline focus:outline-none focus:ring-2 ${
-        error ? "ring-2 ring-error/40 focus:ring-error/40" : "focus:ring-primary/20"
+    `w-full px-3 py-2 bg-slate-50 border text-slate-900 rounded-xl text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
+        error
+            ? "border-rose-400 focus:ring-rose-500/20 focus:border-rose-500"
+            : "border-slate-200 focus:ring-teal-700/20 focus:border-teal-700"
     }`;
 
 const statusStyles = {
-    "not-started": { label: "Not started", tone: "bg-surface-container text-on-surface-variant" },
-    draft: { label: "Draft", tone: "bg-secondary/10 text-secondary" },
-    completed: { label: "Completed", tone: "bg-tertiary/10 text-tertiary" },
+    "not-started": { label: "Not started", tone: "bg-slate-100 text-slate-600 border border-slate-200" },
+    draft: { label: "Draft", tone: "bg-sky-50 text-sky-700 border border-sky-200" },
+    completed: { label: "Completed", tone: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
 };
 
 function Field({ id, label, error, className = "", children }) {
     return (
         <div className={className}>
-            <label htmlFor={id} className="block font-label-sm text-label-sm font-semibold text-on-surface mb-1">
+            <label htmlFor={id} className="block text-xs font-semibold text-slate-700 mb-1">
                 {label}
             </label>
             {children}
-            {error && <p className="mt-1 font-body-sm text-body-sm text-error">{error}</p>}
+            {error && <p className="mt-1 text-[11px] text-rose-600 font-semibold">{error}</p>}
         </div>
     );
 }
@@ -102,8 +104,8 @@ function RecapRow({ label, children }) {
     if (!children) return null;
     return (
         <div>
-            <dt className="font-body-sm text-body-sm text-outline">{label}</dt>
-            <dd className="font-body-md text-body-md text-on-surface whitespace-pre-line">{children}</dd>
+            <dt className="text-slate-400 text-[11px] font-semibold">{label}</dt>
+            <dd className="text-slate-800 text-xs font-medium whitespace-pre-line mt-0.5">{children}</dd>
         </div>
     );
 }
@@ -112,16 +114,16 @@ function CompletedPanel({ patient, record }) {
     const { consultation: c, prescription: p } = record;
 
     return (
-        <div className="space-y-space-md">
+        <div className="space-y-4">
             <div
                 role="status"
-                className="flex items-center gap-2 px-space-md py-space-sm rounded-xl bg-tertiary/10 text-tertiary font-label-md text-label-md font-semibold"
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-semibold"
             >
                 <Icon className="text-[18px]">check_circle</Icon>
                 Consultation completed successfully.
             </div>
 
-            <dl className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+            <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/60">
                 <RecapRow label="Chief complaint / reason for visit">{c.reason}</RecapRow>
                 <RecapRow label="Diagnosis">{c.diagnosis}</RecapRow>
                 <RecapRow label="Symptoms / clinical notes">{c.symptoms}</RecapRow>
@@ -130,22 +132,22 @@ function CompletedPanel({ patient, record }) {
                 <RecapRow label="Follow-up / next steps">{c.followUp}</RecapRow>
             </dl>
 
-            <div className="space-y-space-sm">
-                <h3 className="font-title-md text-title-md text-on-surface font-bold">Prescription</h3>
+            <div className="space-y-3">
+                <h3 className="text-sm font-bold text-slate-900">Prescription</h3>
                 {!p ? (
-                    <p className="font-body-md text-body-md text-on-surface-variant">No medicines prescribed.</p>
+                    <p className="text-xs text-slate-500 font-medium">No medicines prescribed.</p>
                 ) : (
-                    <ul className="grid grid-cols-1 lg:grid-cols-2 gap-space-sm">
+                    <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         {p.medications.map((m, index) => (
-                            <li key={`${m.name}-${index}`} className="px-space-md py-space-sm bg-surface-container-low rounded-xl">
-                                <span className="font-label-md text-label-md text-on-surface font-semibold">
+                            <li key={`${m.name}-${index}`} className="px-3.5 py-2.5 bg-slate-50 border border-slate-200/60 rounded-xl">
+                                <span className="text-xs font-bold text-slate-900">
                                     {m.name} {m.dosage}
                                 </span>
-                                <span className="block font-body-sm text-body-sm text-on-surface-variant">
+                                <span className="block text-[11px] text-slate-500 font-medium mt-0.5">
                                     {m.frequency} • {m.duration}
                                 </span>
                                 {m.instructions && (
-                                    <span className="block font-body-sm text-body-sm text-outline">{m.instructions}</span>
+                                    <span className="block text-[11px] text-slate-400 mt-0.5">Instructions: {m.instructions}</span>
                                 )}
                             </li>
                         ))}
@@ -153,20 +155,20 @@ function CompletedPanel({ patient, record }) {
                 )}
             </div>
 
-            <p className="font-body-sm text-body-sm text-outline">
-                Saved for this session only. 
+            <p className="text-[11px] text-slate-400 font-medium">
+                Saved for this session only.
             </p>
 
-            <div className="flex flex-wrap items-center gap-space-sm">
+            <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
                     to="/doctor/patients"
-                    className="px-space-lg py-2.5 bg-primary text-on-primary rounded-xl font-label-md text-label-md font-semibold hover:bg-primary-container transition-colors shadow-sm"
+                    className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-semibold transition-all shadow-xs"
                 >
                     Back to My Patients
                 </Link>
                 <Link
                     to={`/doctor/patients/${patient.id}/records`}
-                    className="px-space-lg py-2.5 bg-surface-container-low text-on-surface rounded-xl font-label-md text-label-md font-semibold hover:bg-surface-container transition-colors"
+                    className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all shadow-xs"
                 >
                     View Medical Records
                 </Link>
@@ -205,15 +207,15 @@ export default function ConsultationTab() {
     };
 
     return (
-        <section className="space-y-space-lg">
-            <div className="flex flex-wrap items-start justify-between gap-space-sm">
+        <section className="space-y-6">
+            <div className="flex flex-wrap items-start justify-between gap-3 pb-2 border-b border-slate-100">
                 <div>
-                    <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Current Consultation</h2>
-                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    <h2 className="text-base font-bold text-slate-900">Current Consultation</h2>
+                    <p className="text-xs text-slate-500 font-medium">
                         {patient.visitType} • {formatDate(todayISO())}
                     </p>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-full font-label-sm text-label-sm font-semibold ${badge.tone}`}>
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${badge.tone}`}>
                     {badge.label}
                 </span>
             </div>
@@ -227,11 +229,11 @@ export default function ConsultationTab() {
                     noValidate
                     onSubmit={handleComplete}
                     onChange={() => draftSaved && setDraftSaved(false)}
-                    className="space-y-space-lg"
+                    className="space-y-6"
                 >
                     {/* Consultation */}
-                    <section className="space-y-space-md">
-                        <h3 className="font-title-md text-title-md text-on-surface font-bold">Consultation</h3>
+                    <section className="space-y-4">
+                        <h3 className="text-sm font-bold text-slate-900">Consultation Evaluation</h3>
 
                         <Field id="consult-complaint" label="Chief Complaint / Reason for Visit" error={err.chiefComplaint}>
                             <input
@@ -245,7 +247,7 @@ export default function ConsultationTab() {
                             />
                         </Field>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Field id="consult-symptoms" label="Symptoms / Clinical Notes">
                                 <textarea
                                     id="consult-symptoms"
@@ -280,7 +282,7 @@ export default function ConsultationTab() {
                             />
                         </Field>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Field id="consult-treatment" label="Treatment / Advice">
                                 <textarea
                                     id="consult-treatment"
@@ -304,7 +306,7 @@ export default function ConsultationTab() {
                         </div>
                     </section>
 
-                    <hr className="border-surface-container" />
+                    <hr className="border-slate-200/80" />
 
                     {/* Prescription */}
                     <PrescriptionSection
@@ -315,14 +317,14 @@ export default function ConsultationTab() {
                         allergyLabel={allergyLabel}
                     />
 
-                    <hr className="border-surface-container" />
+                    <hr className="border-slate-200/80" />
 
                     {/* Actions */}
-                    <div className="space-y-space-sm">
+                    <div className="space-y-3">
                         {draftSaved && (
                             <div
                                 role="status"
-                                className="flex items-center gap-2 px-space-md py-space-sm rounded-xl bg-secondary/10 text-secondary font-label-md text-label-md font-semibold"
+                                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-sky-50 text-sky-800 border border-sky-200/80 text-xs font-semibold"
                             >
                                 <Icon className="text-[18px]">save</Icon>
                                 Draft saved.
@@ -331,23 +333,23 @@ export default function ConsultationTab() {
                         {submitted && result.hasErrors && (
                             <div
                                 role="alert"
-                                className="flex items-center gap-2 px-space-md py-space-sm rounded-xl bg-error/10 text-error font-label-md text-label-md font-semibold"
+                                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200/80 text-xs font-semibold"
                             >
                                 <Icon className="text-[18px]">error</Icon>
                                 Please complete the highlighted fields.
                             </div>
                         )}
-                        <div className="flex flex-wrap items-center gap-space-sm">
+                        <div className="flex flex-wrap items-center gap-3">
                             <button
                                 type="submit"
-                                className="px-space-lg py-2.5 bg-primary text-on-primary rounded-xl font-label-md text-label-md font-semibold hover:bg-primary-container transition-colors shadow-sm"
+                                className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-semibold transition-all shadow-xs"
                             >
                                 Complete Consultation
                             </button>
                             <button
                                 type="button"
                                 onClick={handleSaveDraft}
-                                className="px-space-lg py-2.5 bg-surface-container-low text-on-surface rounded-xl font-label-md text-label-md font-semibold hover:bg-surface-container transition-colors"
+                                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all shadow-xs"
                             >
                                 Save Draft
                             </button>
