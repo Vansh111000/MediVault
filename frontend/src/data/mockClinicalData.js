@@ -28,10 +28,10 @@ export const medicalRecords = {
         rec("report", "Lipid panel", "2026-08-10", "Total cholesterol 218 mg/dL.", "CityCare Hospital"),
     ],
     "MV-10831": [
-        rec("consultation", "General check-up", "2026-07-03", "No major concerns. Advised dietary changes.", "MediVault Clinic"),
-        rec("diagnosis", "Mild iron deficiency", "2026-07-03", "Low ferritin levels noted.", "MediVault Clinic"),
-        rec("prescription", "Iron supplement, once daily", "2026-07-03", "60-day course.", "MediVault Clinic"),
-        rec("report", "Metabolic panel", "2026-07-02", "Values within normal range.", "MediVault Clinic"),
+        rec("consultation", "General check-up", "2026-07-03", "No major concerns. Advised dietary changes.", "HealthPlus Hospital"),
+        rec("diagnosis", "Mild iron deficiency", "2026-07-03", "Low ferritin levels noted.", "HealthPlus Hospital"),
+        rec("prescription", "Iron supplement, once daily", "2026-07-03", "60-day course.", "HealthPlus Hospital"),
+        rec("report", "Metabolic panel", "2026-07-02", "Values within normal range.", "HealthPlus Hospital"),
     ],
     "MV-09217": [
         rec("consultation", "Chest discomfort follow-up", "2026-08-22", "Follow-up after chest discomfort episode.", "Sunrise Heart Institute"),
@@ -40,16 +40,16 @@ export const medicalRecords = {
         rec("report", "ECG report", "2026-08-21", "Mild ST-segment changes noted.", "Sunrise Heart Institute"),
     ],
     "MV-11204": [
-        rec("consultation", "Specialist referral review", "2026-08-30", "Referred for specialist cardiac review.", "MediVault Clinic"),
-        rec("diagnosis", "Palpitations under evaluation", "2026-08-30", "Occasional episodes of irregular heartbeat.", "MediVault Clinic"),
-        rec("prescription", "Metoprolol 25mg, twice daily", "2026-08-30", "Review after two weeks.", "MediVault Clinic"),
-        rec("report", "Echocardiogram", "2026-08-29", "Normal heart structure and function.", "MediVault Clinic"),
+        rec("consultation", "Specialist referral review", "2026-08-30", "Referred for specialist cardiac review.", "HealthPlus Hospital"),
+        rec("diagnosis", "Palpitations under evaluation", "2026-08-30", "Occasional episodes of irregular heartbeat.", "HealthPlus Hospital"),
+        rec("prescription", "Metoprolol 25mg, twice daily", "2026-08-30", "Review after two weeks.", "HealthPlus Hospital"),
+        rec("report", "Echocardiogram", "2026-08-29", "Normal heart structure and function.", "HealthPlus Hospital"),
     ],
     "MV-08943": [
-        rec("consultation", "Lab results review", "2026-09-05", "Review of recent lab results.", "MediVault Clinic"),
-        rec("diagnosis", "Type 2 diabetes, controlled", "2026-09-05", "Blood sugar within target range.", "MediVault Clinic"),
-        rec("prescription", "Metformin 500mg, twice daily", "2026-09-05", "Take with meals.", "MediVault Clinic"),
-        rec("report", "HbA1c report", "2026-09-04", "HbA1c 6.8%.", "MediVault Clinic"),
+        rec("consultation", "Lab results review", "2026-09-05", "Review of recent lab results.", "HealthPlus Hospital"),
+        rec("diagnosis", "Type 2 diabetes, controlled", "2026-09-05", "Blood sugar within target range.", "HealthPlus Hospital"),
+        rec("prescription", "Metformin 500mg, twice daily", "2026-09-05", "Take with meals.", "HealthPlus Hospital"),
+        rec("report", "HbA1c report", "2026-09-04", "HbA1c 6.8%.", "HealthPlus Hospital"),
     ],
     "MV-11377": [
         rec("consultation", "Fatigue follow-up", "2026-09-14", "Follow-up for recurring fatigue.", "Lotus Multispeciality"),
@@ -58,10 +58,10 @@ export const medicalRecords = {
         rec("report", "Complete blood count", "2026-09-13", "Haemoglobin slightly low.", "Lotus Multispeciality"),
     ],
     "MV-07761": [
-        rec("consultation", "Routine heart failure follow-up", "2026-09-18", "Condition stable. Continue current plan.", "MediVault Clinic"),
-        rec("diagnosis", "Chronic heart failure, stable", "2026-09-18", "No change in symptoms since last visit.", "MediVault Clinic"),
-        rec("prescription", "Furosemide 40mg, once daily", "2026-09-18", "Take in the morning.", "MediVault Clinic"),
-        rec("report", "Chest X-ray", "2026-09-17", "No acute changes.", "MediVault Clinic"),
+        rec("consultation", "Routine heart failure follow-up", "2026-09-18", "Condition stable. Continue current plan.", "HealthPlus Hospital"),
+        rec("diagnosis", "Chronic heart failure, stable", "2026-09-18", "No change in symptoms since last visit.", "HealthPlus Hospital"),
+        rec("prescription", "Furosemide 40mg, once daily", "2026-09-18", "Take in the morning.", "HealthPlus Hospital"),
+        rec("report", "Chest X-ray", "2026-09-17", "No acute changes.", "HealthPlus Hospital"),
     ],
 };
 
@@ -167,5 +167,19 @@ export function getBodyMeasurements(patient) {
     return {
         height: m ? `${m.heightCm} cm` : "—",
         weight: m ? `${m.weightKg} kg` : "—",
+    };
+}
+
+// ---------- New prescription medicine row ----------
+let medicineSeq = 0;
+export function createMedicine() {
+    medicineSeq += 1;
+    return {
+        id: `med-${medicineSeq}`,
+        name: "",
+        dosage: "",
+        frequency: FREQUENCIES[0],
+        duration: "",
+        instructions: "",
     };
 }

@@ -8,7 +8,7 @@
 //   bloodReports[].results[] (flag set)      -> important blood values
 //   otherReports[].summary                   -> imaging / ECG findings
 
-// flag: "high" | "low" (omit when the value is inside the reference range)
+// flag: "high" | "low"
 const t = (test, result, unit, range, flag) => ({ test, result, unit, range, flag });
 
 export const patientsRecords = {
@@ -120,7 +120,7 @@ export const patientsRecords = {
                 id: "MV-10831-c1",
                 date: "2026-07-03",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 visitType: "New Consultation",
                 reason: "Tiredness and low energy for the past month",
                 diagnosis: "Mild iron deficiency",
@@ -130,7 +130,7 @@ export const patientsRecords = {
                 id: "MV-10831-c2",
                 date: "2026-04-18",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 visitType: "Follow-up",
                 reason: "General health check-up",
                 diagnosis: "No significant findings",
@@ -142,7 +142,7 @@ export const patientsRecords = {
                 id: "MV-10831-p1",
                 date: "2026-07-03",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 status: "Active",
                 medications: [
                     { name: "Ferrous sulfate", dosage: "200 mg", frequency: "Once daily", duration: "60 days", instructions: "Take after a meal. May cause mild stomach upset." },
@@ -154,7 +154,7 @@ export const patientsRecords = {
                 id: "MV-10831-b1",
                 name: "Complete Blood Count (CBC)",
                 date: "2026-07-02",
-                lab: "MediVault Diagnostics",
+                lab: "HealthPlus Diagnostics",
                 status: "Available",
                 results: [
                     t("Hemoglobin", "11.2", "g/dL", "12.0–15.5", "low"),
@@ -169,7 +169,7 @@ export const patientsRecords = {
                 id: "MV-10831-b2",
                 name: "Iron Studies",
                 date: "2026-07-02",
-                lab: "MediVault Diagnostics",
+                lab: "HealthPlus Diagnostics",
                 status: "Available",
                 results: [
                     t("Serum Iron", "42", "µg/dL", "60–170", "low"),
@@ -255,7 +255,7 @@ export const patientsRecords = {
                 id: "MV-11204-c1",
                 date: "2026-08-30",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 visitType: "Specialist Review",
                 reason: "Occasional episodes of irregular heartbeat",
                 diagnosis: "Palpitations under evaluation",
@@ -267,7 +267,7 @@ export const patientsRecords = {
                 id: "MV-11204-p1",
                 date: "2026-08-30",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 status: "Active",
                 medications: [
                     { name: "Metoprolol", dosage: "25 mg", frequency: "Twice daily", duration: "14 days", instructions: "Review after two weeks." },
@@ -279,7 +279,7 @@ export const patientsRecords = {
                 id: "MV-11204-b1",
                 name: "Thyroid Profile",
                 date: "2026-08-29",
-                lab: "MediVault Diagnostics",
+                lab: "HealthPlus Diagnostics",
                 status: "Available",
                 results: [
                     t("TSH", "2.4", "µIU/mL", "0.4–4.0"),
@@ -294,7 +294,7 @@ export const patientsRecords = {
                 name: "Echocardiogram Report",
                 type: "Echo",
                 date: "2026-08-29",
-                center: "MediVault Clinic",
+                center: "HealthPlus Hospital",
                 description: "Transthoracic echocardiogram.",
                 summary: "Normal heart structure and function described in the submitted echocardiogram report.",
             },
@@ -308,7 +308,7 @@ export const patientsRecords = {
                 id: "MV-08943-c1",
                 date: "2026-09-05",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 visitType: "Lab Review",
                 reason: "Review of recent blood sugar results",
                 diagnosis: "Type 2 diabetes, controlled",
@@ -318,7 +318,7 @@ export const patientsRecords = {
                 id: "MV-08943-c2",
                 date: "2026-06-12",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 visitType: "Follow-up",
                 reason: "Routine diabetes follow-up",
                 diagnosis: "Type 2 diabetes",
@@ -330,7 +330,7 @@ export const patientsRecords = {
                 id: "MV-08943-p1",
                 date: "2026-09-05",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 status: "Active",
                 medications: [
                     { name: "Metformin", dosage: "500 mg", frequency: "Twice daily", duration: "90 days", instructions: "Take with meals." },
@@ -342,7 +342,7 @@ export const patientsRecords = {
                 id: "MV-08943-b1",
                 name: "HbA1c and Fasting Glucose",
                 date: "2026-09-04",
-                lab: "MediVault Diagnostics",
+                lab: "HealthPlus Diagnostics",
                 status: "Available",
                 results: [
                     t("HbA1c", "6.8", "%", "< 5.7 (non-diabetic)", "high"),
@@ -407,7 +407,7 @@ export const patientsRecords = {
                 id: "MV-07761-c1",
                 date: "2026-09-18",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 visitType: "Follow-up",
                 reason: "Routine heart failure follow-up",
                 diagnosis: "Chronic heart failure, stable",
@@ -417,7 +417,7 @@ export const patientsRecords = {
                 id: "MV-07761-c2",
                 date: "2026-06-20",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 visitType: "Follow-up",
                 reason: "Mild ankle swelling in the evenings",
                 diagnosis: "Chronic heart failure",
@@ -429,7 +429,7 @@ export const patientsRecords = {
                 id: "MV-07761-p1",
                 date: "2026-09-18",
                 doctor: "Dr. Neha Joshi",
-                hospital: "MediVault Clinic",
+                hospital: "HealthPlus Hospital",
                 status: "Active",
                 medications: [
                     { name: "Furosemide", dosage: "40 mg", frequency: "Once daily", duration: "30 days", instructions: "Take in the morning." },
@@ -442,7 +442,7 @@ export const patientsRecords = {
                 id: "MV-07761-b1",
                 name: "Kidney Function Test",
                 date: "2026-09-17",
-                lab: "MediVault Diagnostics",
+                lab: "HealthPlus Diagnostics",
                 status: "Available",
                 results: [
                     t("Creatinine", "1.2", "mg/dL", "0.7–1.3"),
@@ -458,7 +458,7 @@ export const patientsRecords = {
                 name: "Chest X-Ray Report",
                 type: "X-Ray",
                 date: "2026-09-17",
-                center: "MediVault Clinic Radiology",
+                center: "HealthPlus Hospital Radiology",
                 description: "Frontal chest radiograph.",
                 summary: "No acute changes described in the submitted chest X-ray report.",
             },

@@ -6,14 +6,13 @@ export const doctor = {
     specialty: "Cardiology",
     role: "Attending Physician",
     onDuty: true,
-    hospital: "MediVault Clinic",
+    hospital: "HealthPlus Hospital",
     wing: "Central Wing",
     room: "OPD Suite 4B",
     shift: "08:30 AM – 02:00 PM",
 };
 
 // status: waiting | checked-in | in-room | upcoming | completed
-// consent.type: cross-hospital | own-hospital | none | revoked
 export const patients = [
     {
         id: "MV-10482",

@@ -3,13 +3,11 @@ import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import StatusBadge from "../../components/doctor/StatusBadge";
 import { patients } from "../../data/mockDoctorData";
-import { FREQUENCIES, getAllergyLabel, getBodyMeasurements } from "../../data/mockClinicalData";
+import { createMedicine, getAllergyLabel, getBodyMeasurements } from "../../data/mockClinicalData";
 
 const tabs = [
-    { label: "Medical Records", to: "records", icon: "folder_shared" },
-    { label: "AI Summary", to: "summary", icon: "auto_awesome" },
     { label: "Consultation", to: "consultation", icon: "stethoscope" },
-    { label: "Prescription", to: "prescription", icon: "medication" },
+    { label: "Medical Records", to: "records", icon: "folder_shared" },
 ];
 
 const tabClass = ({ isActive }) =>
@@ -52,18 +50,14 @@ function WorkspaceBody({ patient }) {
     const [consultForm, setConsultForm] = useState({
         chiefComplaint: "",
         symptoms: "",
+        examination: "",
         diagnosis: "",
-        notes: "",
+        treatment: "",
+        followUp: "",
     });
-    const [consultStatus, setConsultStatus] = useState("not-started");
-    const [rxForm, setRxForm] = useState({
-        medication: "",
-        dosage: "",
-        frequency: FREQUENCIES[0],
-        duration: "",
-        instructions: "",
-    });
-    const [newPrescriptions, setNewPrescriptions] = useState([]);
+    const [medicines, setMedicines] = useState(() => [createMedicine()]);
+    const [consultStatus, setConsultStatus] = useState("not-started"); // not-started | draft | completed
+    const [completedRecord, setCompletedRecord] = useState(null);
 
     const allergyLabel = getAllergyLabel(patient);
     const { height, weight } = getBodyMeasurements(patient);
@@ -78,8 +72,16 @@ function WorkspaceBody({ patient }) {
     const context = {
         patient,
         allergyLabel,
-        consult: { form: consultForm, setForm: setConsultForm, status: consultStatus, setStatus: setConsultStatus },
-        rx: { form: rxForm, setForm: setRxForm, items: newPrescriptions, setItems: setNewPrescriptions },
+        consult: {
+            form: consultForm,
+            setForm: setConsultForm,
+            medicines,
+            setMedicines,
+            status: consultStatus,
+            setStatus: setConsultStatus,
+            completed: completedRecord,
+            setCompleted: setCompletedRecord,
+        },
     };
 
     return (
@@ -92,7 +94,7 @@ function WorkspaceBody({ patient }) {
                 Back to My Patients
             </Link>
 
-            {/* Patient context: always visible */}
+            {/* Patient context */}
             <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-space-lg space-y-space-md">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
                     <div className="flex items-center gap-space-md">
