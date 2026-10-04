@@ -10,7 +10,6 @@ import { ToastContainer } from "./components/Shared/ToastContainer";
 
 import DoctorLayout from "./layouts/DoctorLayout";
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
-import MyPatients from "./pages/doctor/MyPatients";
 import PatientWorkspace from "./pages/doctor/PatientWorkspace";
 import MedicalRecordsTab from "./pages/doctor/patient-workspace/MedicalRecordsTab";
 import ConsultationTab from "./pages/doctor/patient-workspace/ConsultationTab";
@@ -18,13 +17,11 @@ import MedicalRecords from "./pages/doctor/MedicalRecords";
 import Consultations from "./pages/doctor/Consultations";
 import Prescriptions from "./pages/doctor/Prescriptions";
 
-const DoctorPortal = () => {
+const DoctorPortal = ({ onNavigateHome }) => {
     return (
         <Routes>
-            <Route path="/doctor" element={<DoctorLayout />}>
+            <Route path="/doctor" element={<DoctorLayout onNavigateHome={onNavigateHome} />}>
                 <Route index element={<DoctorDashboard />} />
-
-                <Route path="patients" element={<MyPatients />} />
 
                 <Route path="patients/:patientId" element={<PatientWorkspace />}>
                     <Route
@@ -127,7 +124,7 @@ const MainLayout = () => {
             )}
 
             {currentView === "doctor" && (
-                <DoctorPortal />
+                <DoctorPortal onNavigateHome={handleNavigateHome} />
             )}
 
             {currentView === "patient" && (

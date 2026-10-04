@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import StatusBadge from "./StatusBadge";
 import Icon from "../Icon";
-
-const INITIAL_VISIBLE = 5;
+import { toDisplayStatus, toDisplayVisitType } from "./patientDisplay";
 
 const avatarTones = [
     "bg-teal-50 text-teal-700 border border-teal-200/60",
@@ -15,17 +14,12 @@ const avatarTones = [
 const visitTypeTones = {
     "Follow-up": "bg-slate-100 text-slate-700 border border-slate-200/60",
     "New Consultation": "bg-sky-50 text-sky-700 border border-sky-200/60 font-semibold",
-    "Specialist Review": "bg-teal-50 text-teal-700 border border-teal-200/60 font-semibold",
-    "Lab Review": "bg-amber-50 text-amber-700 border border-amber-200/60 font-semibold",
 };
 
-const FILTERS = ["all", "waiting", "checked-in", "in-room", "upcoming", "completed"];
+const FILTERS = ["waiting", "upcoming", "completed"];
 
 const FILTER_LABELS = {
-    all: "All",
     waiting: "Waiting",
-    "checked-in": "Checked In",
-    "in-room": "In Room",
     upcoming: "Upcoming",
     completed: "Completed",
 };
@@ -42,16 +36,15 @@ function initials(name) {
 export default function PatientQueue({ patients }) {
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
-    const [showAll, setShowAll] = useState(false);
 
-    const counts = { all: patients.length };
-    FILTERS.slice(1).forEach((key) => {
-        counts[key] = patients.filter((p) => p.status === key).length;
+    const counts = {};
+    FILTERS.forEach((key) => {
+        counts[key] = patients.filter((p) => toDisplayStatus(p.status) === key).length;
     });
 
     const normalizedQuery = query.trim().toLowerCase();
     const matches = patients.filter((p) => {
-        const matchesFilter = filter === "all" || p.status === filter;
+        const matchesFilter = filter === "all" || toDisplayStatus(p.status) === filter;
         const matchesQuery =
             !normalizedQuery ||
             p.name.toLowerCase().includes(normalizedQuery) ||
@@ -59,9 +52,7 @@ export default function PatientQueue({ patients }) {
         return matchesFilter && matchesQuery;
     });
 
-    const isNarrowed = filter !== "all" || normalizedQuery !== "";
-    const visible = showAll || isNarrowed ? matches : matches.slice(0, INITIAL_VISIBLE);
-    const hiddenCount = matches.length - visible.length;
+    const visible = matches;
 
     return (
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 space-y-4">
@@ -69,12 +60,9 @@ export default function PatientQueue({ patients }) {
                 <div>
                     <h2 className="text-lg font-bold text-slate-900">Today's Patients</h2>
                     <p className="text-xs text-slate-500 font-medium">
-                        Patients assigned to you for consultation by the hospital assistant.
+                        Search and open the patients assigned to you.
                     </p>
                 </div>
-                <span className="self-start px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200/60 text-[11px] font-bold">
-                    Assigned by reception
-                </span>
             </div>
 
             {/* Search & filters */}
@@ -85,7 +73,7 @@ export default function PatientQueue({ patients }) {
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search your patients by name or Patient ID..."
+                        placeholder="Search by patient name or ID..."
                         className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:border-teal-700 font-medium transition-all"
                     />
                 </div>
@@ -95,7 +83,7 @@ export default function PatientQueue({ patients }) {
                         <button
                             key={key}
                             type="button"
-                            onClick={() => setFilter(key)}
+                            onClick={() => setFilter(filter === key ? "all" : key)}
                             className={`px-3 py-1.5 rounded-xl text-xs transition-all ${
                                 filter === key
                                     ? "bg-teal-700 text-white font-bold shadow-xs"
@@ -180,42 +168,37 @@ export default function PatientQueue({ patients }) {
                                         >
                                             {patient.time}
                                         </span>
-                                        <span
-                                            className={`block text-[11px] ${
-                                                done ? "text-slate-400" : "text-slate-500"
-                                            }`}
-                                        >
-                                            {patient.location}
-                                        </span>
                                     </td>
 
                                     <td className="py-3 px-3">
                                         <span
                                             className={`px-2 py-0.5 rounded-md text-[11px] ${
-                                                visitTypeTones[patient.visitType] ?? visitTypeTones["Follow-up"]
+                                                visitTypeTones[toDisplayVisitType(patient.visitType)]
                                             }`}
                                         >
-                                            {patient.visitType}
+                                            {toDisplayVisitType(patient.visitType)}
                                         </span>
                                     </td>
 
                                     <td className="py-3 px-3">
-                                        <StatusBadge status={patient.status} />
+                                        <StatusBadge status={toDisplayStatus(patient.status)} />
                                     </td>
 
                                     <td className="py-3 px-4 text-right">
+                                        {toDisplayStatus(patient.status) !== "upcoming" && (
                                         <Link
                                             to={`/doctor/patients/${patient.id}`}
                                             className={`inline-block whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                                                patient.status === "waiting"
+                                                toDisplayStatus(patient.status) === "waiting"
                                                     ? "bg-teal-700 hover:bg-teal-800 text-white shadow-xs"
                                                     : done
                                                       ? "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-xs"
                                                       : "bg-white hover:bg-slate-50 text-teal-700 border border-teal-200 shadow-xs"
                                             }`}
                                         >
-                                            {patient.status === "waiting" ? "Open Vault" : done ? "Summary" : "View"}
+                                            {toDisplayStatus(patient.status) === "waiting" ? "Open Vault" : done ? "Summary" : "View"}
                                         </Link>
+                                        )}
                                     </td>
                                 </tr>
                             );
@@ -224,19 +207,8 @@ export default function PatientQueue({ patients }) {
                 </table>
             </div>
 
-            <div className="flex items-center justify-between pt-1 text-xs text-slate-500">
-                <span>
-                    Showing {visible.length} of {isNarrowed ? matches.length : patients.length} consultations
-                </span>
-                {hiddenCount > 0 && (
-                    <button
-                        type="button"
-                        onClick={() => setShowAll(true)}
-                        className="text-teal-700 hover:text-teal-800 font-bold hover:underline"
-                    >
-                        Load remaining {hiddenCount}
-                    </button>
-                )}
+            <div className="pt-1 text-xs text-slate-500">
+                Showing {visible.length} of {patients.length} patients
             </div>
         </div>
     );

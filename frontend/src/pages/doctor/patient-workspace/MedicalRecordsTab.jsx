@@ -8,14 +8,14 @@ const SAMPLE_NOTE = "Sample data for demonstration only.";
 
 function SummaryCard({ icon, label, value, caption }) {
     return (
-        <div className="px-space-md py-space-sm bg-surface-container-low rounded-xl flex items-center gap-space-sm">
-            <span className="w-9 h-9 rounded-lg bg-surface-container-lowest text-primary flex items-center justify-center shrink-0">
+        <div className="px-3.5 py-2.5 bg-white border border-slate-200/90 rounded-xl shadow-xs flex items-center gap-3">
+            <span className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 border border-teal-200/60 flex items-center justify-center shrink-0">
                 <Icon className="text-[20px]">{icon}</Icon>
             </span>
             <div className="flex flex-col">
-                <span className="font-headline-sm text-headline-sm text-on-surface font-bold leading-tight">{value}</span>
-                <span className="font-label-sm text-label-sm text-on-surface-variant">{label}</span>
-                {caption && <span className="font-body-sm text-body-sm text-outline">{caption}</span>}
+                <span className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">{value}</span>
+                <span className="text-[11px] font-semibold text-slate-500 mt-1">{label}</span>
+                {caption && <span className="text-[11px] text-slate-400 font-medium">{caption}</span>}
             </div>
         </div>
     );
@@ -23,16 +23,16 @@ function SummaryCard({ icon, label, value, caption }) {
 
 function Section({ icon, title, count, emptyText, children }) {
     return (
-        <section className="space-y-space-sm">
+        <section className="space-y-3">
             <div className="flex items-center gap-2">
-                <Icon className="text-primary text-[20px]">{icon}</Icon>
-                <h3 className="font-title-md text-title-md text-on-surface font-bold">{title}</h3>
-                <span className="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-semibold">
+                <Icon className="text-teal-700 text-[20px]">{icon}</Icon>
+                <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-bold">
                     {count}
                 </span>
             </div>
             {count === 0 ? (
-                <p className="px-space-md py-space-sm bg-surface-container-low rounded-xl font-body-md text-body-md text-on-surface-variant">
+                <p className="px-3.5 py-2.5 bg-slate-50 border border-slate-200/60 rounded-xl text-xs text-slate-500 font-medium">
                     {emptyText}
                 </p>
             ) : (
@@ -49,7 +49,7 @@ function ToggleButton({ open, onClick, openLabel, closedLabel, controls }) {
             onClick={onClick}
             aria-expanded={open}
             aria-controls={controls}
-            className="inline-flex items-center gap-1 font-label-sm text-label-sm text-primary font-semibold hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-teal-700 hover:text-teal-800 font-semibold hover:underline"
         >
             {open ? openLabel : closedLabel}
             <Icon className="text-[16px]">{open ? "expand_less" : "expand_more"}</Icon>
@@ -59,7 +59,7 @@ function ToggleButton({ open, onClick, openLabel, closedLabel, controls }) {
 
 function HistoricalLabel() {
     return (
-        <span className="px-2 py-0.5 rounded-md bg-surface-container text-on-surface-variant font-label-sm text-label-sm whitespace-nowrap">
+        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/60 text-[11px] font-medium whitespace-nowrap">
             Historical record
         </span>
     );
@@ -68,15 +68,15 @@ function HistoricalLabel() {
 function DetailRow({ label, children }) {
     return (
         <div>
-            <dt className="font-body-sm text-body-sm text-outline">{label}</dt>
-            <dd className="font-body-md text-body-md text-on-surface">{children}</dd>
+            <dt className="text-[11px] text-slate-400 font-medium">{label}</dt>
+            <dd className="text-xs text-slate-900 font-medium">{children}</dd>
         </div>
     );
 }
 
 const flagStyles = {
-    high: { label: "High", tone: "bg-error/10 text-error" },
-    low: { label: "Low", tone: "bg-secondary/10 text-secondary" },
+    high: { label: "High", tone: "bg-rose-50 text-rose-700 border border-rose-200/70" },
+    low: { label: "Low", tone: "bg-sky-50 text-sky-700 border border-sky-200/70" },
 };
 
 export default function MedicalRecordsTab() {
@@ -98,8 +98,8 @@ export default function MedicalRecordsTab() {
 
     const header = (
         <div>
-            <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Medical Records</h2>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
+            <h2 className="text-lg font-bold text-slate-900">Medical Records</h2>
+            <p className="text-xs text-slate-500 font-medium">
                 Review the patient's previous consultations, prescriptions and reports.
             </p>
         </div>
@@ -107,14 +107,14 @@ export default function MedicalRecordsTab() {
 
     if (!hasRecords) {
         return (
-            <section className="space-y-space-md">
+            <section className="space-y-4">
                 {header}
-                <div className="py-space-xl flex flex-col items-center text-center gap-1">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-space-sm">
+                <div className="py-10 flex flex-col items-center text-center gap-1">
+                    <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 border border-teal-200/60 flex items-center justify-center mb-2">
                         <Icon className="text-[24px]">folder_off</Icon>
                     </div>
-                    <h3 className="font-title-md text-title-md text-on-surface font-semibold">No previous records</h3>
-                    <p className="font-body-md text-body-md text-on-surface-variant">
+                    <h3 className="text-base font-bold text-slate-900">No previous records</h3>
+                    <p className="text-xs text-slate-500 font-medium">
                         Medical history will appear here when records are available.
                     </p>
                 </div>
@@ -123,11 +123,11 @@ export default function MedicalRecordsTab() {
     }
 
     return (
-        <section className="space-y-space-lg">
+        <section className="space-y-6">
             {header}
 
             {/* Summary row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-space-sm">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <SummaryCard icon="stethoscope" label="Consultations" value={consultations.length} />
                 <SummaryCard
                     icon="medication"
@@ -146,34 +146,34 @@ export default function MedicalRecordsTab() {
                 count={consultations.length}
                 emptyText="No previous consultations."
             >
-                <ul className="space-y-space-sm">
+                <ul className="space-y-3">
                     {consultations.map((c) => {
                         const open = !!openIds[c.id];
                         return (
-                            <li key={c.id} className="p-space-md bg-surface-container-low rounded-xl space-y-space-sm">
-                                <div className="flex flex-wrap items-start justify-between gap-space-sm">
+                            <li key={c.id} className="p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <div className="flex flex-wrap items-center gap-space-sm">
-                                            <span className="font-label-md text-label-md text-on-surface font-semibold">
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <span className="text-xs font-bold text-slate-900">
                                                 {formatDate(c.date)}
                                             </span>
-                                            <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-label-sm text-label-sm font-medium">
+                                            <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/60 text-[11px] font-semibold">
                                                 {c.visitType}
                                             </span>
                                         </div>
-                                        <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                                             {c.hospital} • {c.doctor}
                                         </p>
                                     </div>
                                     <HistoricalLabel />
                                 </div>
 
-                                <p className="font-body-md text-body-md text-on-surface">
+                                <p className="text-xs text-slate-900 font-medium">
                                     <span className="font-semibold">{c.diagnosis}</span>
                                 </p>
 
                                 {open && (
-                                    <dl id={`${c.id}-details`} className="space-y-space-sm pt-space-sm border-t border-surface-container">
+                                    <dl id={`${c.id}-details`} className="space-y-3 pt-3 border-t border-slate-100">
                                         <DetailRow label="Reason for visit">{c.reason}</DetailRow>
                                         <DetailRow label="Diagnosis">{c.diagnosis}</DetailRow>
                                         <DetailRow label="Treatment / clinical notes">{c.treatment}</DetailRow>
@@ -200,28 +200,28 @@ export default function MedicalRecordsTab() {
                 count={prescriptions.length}
                 emptyText="No previous prescriptions."
             >
-                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-space-sm items-start">
+                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
                     {prescriptions.map((p) => {
                         const open = !!openIds[p.id];
                         return (
-                            <li key={p.id} className="p-space-md bg-surface-container-low rounded-xl space-y-space-sm">
-                                <div className="flex flex-wrap items-start justify-between gap-space-sm">
+                            <li key={p.id} className="p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <div className="flex flex-wrap items-center gap-space-sm">
-                                            <span className="font-label-md text-label-md text-on-surface font-semibold">
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <span className="text-xs font-bold text-slate-900">
                                                 {formatDate(p.date)}
                                             </span>
                                             <span
-                                                className={`px-2 py-0.5 rounded-md font-label-sm text-label-sm font-medium ${
+                                                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
                                                     p.status === "Active"
-                                                        ? "bg-tertiary/10 text-tertiary"
-                                                        : "bg-surface-container text-on-surface-variant"
+                                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                                                        : "bg-slate-100 text-slate-600 border border-slate-200/60"
                                                 }`}
                                             >
                                                 {p.status}
                                             </span>
                                         </div>
-                                        <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                                             {p.doctor} • {p.hospital}
                                         </p>
                                     </div>
@@ -230,15 +230,15 @@ export default function MedicalRecordsTab() {
 
                                 <ul className="space-y-1.5">
                                     {p.medications.map((m) => (
-                                        <li key={m.name} className="px-space-sm py-2 bg-surface-container-lowest rounded-lg">
-                                            <span className="font-label-md text-label-md text-on-surface font-semibold">
+                                        <li key={m.name} className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-xl">
+                                            <span className="text-xs font-bold text-slate-900">
                                                 {m.name} {m.dosage}
                                             </span>
-                                            <span className="block font-body-sm text-body-sm text-on-surface-variant">
+                                            <span className="block text-[11px] text-slate-500 font-medium">
                                                 {m.frequency} • {m.duration}
                                             </span>
                                             {open && (
-                                                <span className="block font-body-sm text-body-sm text-outline mt-0.5">
+                                                <span className="block text-[11px] text-slate-400 font-medium mt-0.5">
                                                     Instructions: {m.instructions}
                                                 </span>
                                             )}
@@ -265,22 +265,22 @@ export default function MedicalRecordsTab() {
                 count={bloodReports.length}
                 emptyText="No blood reports."
             >
-                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-space-sm items-start">
+                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
                     {bloodReports.map((r) => {
                         const open = !!openIds[r.id];
                         return (
-                            <li key={r.id} className="p-space-md bg-surface-container-low rounded-xl space-y-space-sm">
-                                <div className="flex flex-wrap items-start justify-between gap-space-sm">
+                            <li key={r.id} className="p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <span className="font-label-md text-label-md text-on-surface font-semibold">
+                                        <span className="text-xs font-bold text-slate-900">
                                             {r.name}
                                         </span>
-                                        <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                                             {formatDate(r.date)} • {r.lab}
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="px-2 py-0.5 rounded-md bg-tertiary/10 text-tertiary font-label-sm text-label-sm font-medium">
+                                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-semibold">
                                             {r.status}
                                         </span>
                                         <HistoricalLabel />
@@ -288,42 +288,42 @@ export default function MedicalRecordsTab() {
                                 </div>
 
                                 {open && (
-                                    <div id={`${r.id}-details`} className="space-y-space-sm pt-space-sm border-t border-surface-container">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left font-body-sm text-body-sm border-collapse">
+                                    <div id={`${r.id}-details`} className="space-y-3 pt-3 border-t border-slate-100">
+                                        <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+                                            <table className="w-full text-left text-xs border-collapse">
                                                 <thead>
-                                                    <tr className="bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
-                                                        <th className="py-2 px-3 rounded-l-lg">Test</th>
+                                                    <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200/80">
+                                                        <th className="py-2 px-3">Test</th>
                                                         <th className="py-2 px-3">Result</th>
                                                         <th className="py-2 px-3">Unit</th>
-                                                        <th className="py-2 px-3 rounded-r-lg">Reference Range</th>
+                                                        <th className="py-2 px-3">Reference Range</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-surface-container">
+                                                <tbody className="divide-y divide-slate-100">
                                                     {r.results.map((row) => {
                                                         const flag = row.flag ? flagStyles[row.flag] : null;
                                                         return (
                                                             <tr key={row.test}>
-                                                                <td className="py-2 px-3 text-on-surface font-semibold">{row.test}</td>
-                                                                <td className="py-2 px-3 text-on-surface whitespace-nowrap">
+                                                                <td className="py-2 px-3 text-slate-900 font-semibold">{row.test}</td>
+                                                                <td className="py-2 px-3 text-slate-900 whitespace-nowrap">
                                                                     <span className="font-semibold">{row.result}</span>
                                                                     {flag && (
                                                                         <span
-                                                                            className={`ml-1.5 px-1.5 py-0.5 rounded font-label-sm text-label-sm font-medium ${flag.tone}`}
+                                                                            className={`ml-1.5 px-1.5 py-0.5 rounded text-[11px] font-semibold ${flag.tone}`}
                                                                         >
                                                                             {flag.label}
                                                                         </span>
                                                                     )}
                                                                 </td>
-                                                                <td className="py-2 px-3 text-on-surface-variant whitespace-nowrap">{row.unit}</td>
-                                                                <td className="py-2 px-3 text-on-surface-variant whitespace-nowrap">{row.range}</td>
+                                                                <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{row.unit}</td>
+                                                                <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{row.range}</td>
                                                             </tr>
                                                         );
                                                     })}
                                                 </tbody>
                                             </table>
                                         </div>
-                                        <p className="font-body-sm text-body-sm text-outline">{SAMPLE_NOTE}</p>
+                                        <p className="text-[11px] text-slate-400 font-medium">{SAMPLE_NOTE}</p>
                                     </div>
                                 )}
 
@@ -347,31 +347,31 @@ export default function MedicalRecordsTab() {
                 count={otherReports.length}
                 emptyText="No other reports."
             >
-                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-space-sm items-start">
+                <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
                     {otherReports.map((r) => {
                         const open = !!openIds[r.id];
                         return (
-                            <li key={r.id} className="p-space-md bg-surface-container-low rounded-xl space-y-space-sm">
-                                <div className="flex flex-wrap items-start justify-between gap-space-sm">
+                            <li key={r.id} className="p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <span className="font-label-md text-label-md text-on-surface font-semibold">
+                                        <span className="text-xs font-bold text-slate-900">
                                             {r.name}
                                         </span>
-                                        <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                                             {formatDate(r.date)} • {r.center}
                                         </p>
                                     </div>
                                     <HistoricalLabel />
                                 </div>
 
-                                <p className="font-body-md text-body-md text-on-surface">{r.description}</p>
+                                <p className="text-xs text-slate-700 font-medium">{r.description}</p>
 
                                 {open && (
-                                    <div id={`${r.id}-details`} className="space-y-space-sm pt-space-sm border-t border-surface-container">
-                                        <dl className="space-y-space-sm">
+                                    <div id={`${r.id}-details`} className="space-y-3 pt-3 border-t border-slate-100">
+                                        <dl className="space-y-3">
                                             <DetailRow label="Summary">{r.summary}</DetailRow>
                                         </dl>
-                                        <p className="font-body-sm text-body-sm text-outline">{SAMPLE_NOTE}</p>
+                                        <p className="text-[11px] text-slate-400 font-medium">{SAMPLE_NOTE}</p>
                                     </div>
                                 )}
 

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import StatusBadge from "../../components/doctor/StatusBadge";
+import { toDisplayStatus, toDisplayVisitType } from "../../components/doctor/patientDisplay";
 import { patients } from "../../data/mockDoctorData";
+import VisitSummary from "./patient-workspace/VisitSummary";
 import { createMedicine, getAllergyLabel, getBodyMeasurements } from "../../data/mockClinicalData";
 
 const tabs = [
@@ -87,11 +89,11 @@ function WorkspaceBody({ patient }) {
     return (
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 space-y-6">
             <Link
-                to="/doctor/patients"
+                to="/doctor"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-teal-700 transition-colors"
             >
                 <Icon className="text-[18px]">arrow_back</Icon>
-                Back to My Patients
+                Back to Dashboard
             </Link>
 
             {/* Patient context */}
@@ -130,19 +132,23 @@ function WorkspaceBody({ patient }) {
                                 {allergyLabel}
                             </span>
                         )}
-                        <StatusBadge status={patient.status} />
+                        <StatusBadge status={toDisplayStatus(patient.status)} />
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-4 border-t border-slate-100">
-                    <InfoRow icon="assignment" label="Visit type" value={patient.visitType} />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+                    <InfoRow icon="assignment" label="Visit type" value={toDisplayVisitType(patient.visitType)} />
                     <InfoRow icon="schedule" label="Appointment time" value={patient.time} />
-                    <InfoRow icon="location_on" label="Location" value={patient.location} />
                     <InfoRow icon="folder_shared" label="Records" value={getRecordAvailability(patient)} />
                 </div>
             </div>
 
-            {/* Workspace: tabs + section content */}
+            {/* Completed visits show only this visit's summary */}
+            {patient.status === "completed" ? (
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6">
+                    <VisitSummary patient={patient} />
+                </div>
+            ) : (
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 space-y-6">
                 <nav
                     aria-label="Patient workspace sections"
@@ -158,6 +164,7 @@ function WorkspaceBody({ patient }) {
 
                 <Outlet context={context} />
             </div>
+            )}
         </div>
     );
 }
@@ -178,10 +185,10 @@ export default function PatientWorkspace() {
                         We couldn't find a patient with ID {patientId}.
                     </p>
                     <Link
-                        to="/doctor/patients"
+                        to="/doctor"
                         className="mt-2 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-semibold transition-all shadow-xs"
                     >
-                        Back to My Patients
+                        Back to Dashboard
                     </Link>
                 </div>
             </div>

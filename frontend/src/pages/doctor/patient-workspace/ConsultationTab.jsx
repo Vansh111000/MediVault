@@ -161,10 +161,10 @@ function CompletedPanel({ patient, record }) {
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
-                    to="/doctor/patients"
+                    to="/doctor"
                     className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-semibold transition-all shadow-xs"
                 >
-                    Back to My Patients
+                    Back to Dashboard
                 </Link>
                 <Link
                     to={`/doctor/patients/${patient.id}/records`}

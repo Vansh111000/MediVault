@@ -155,45 +155,6 @@ export const patients = [
     },
 ];
 
-export const liveFeed = [
-    {
-        id: 1,
-        icon: "person_add",
-        tone: "primary",
-        title: "New patient assigned",
-        text: "Meera Nair routed from OPD Desk 2 by the hospital assistant.",
-        time: "5m ago",
-        unread: true,
-    },
-    {
-        id: 2,
-        icon: "how_to_reg",
-        tone: "error",
-        title: "Patient ready in waiting",
-        text: "Aarav Mehta has checked in and is seated in the OPD Suite 4B lobby.",
-        time: "12m ago",
-        unread: true,
-    },
-    {
-        id: 3,
-        icon: "biotech",
-        tone: "tertiary",
-        title: "Blood report extracted",
-        text: "AI extraction completed for Priya Shah (Metabolic Panel).",
-        time: "25m ago",
-        unread: true,
-    },
-    {
-        id: 4,
-        icon: "folder_shared",
-        tone: "secondary",
-        title: "Previous records available",
-        text: "Rahul Verma's previous consultation history is available for review.",
-        time: "1h ago",
-        unread: false,
-    },
-];
-
 // Drafts the doctor still has to finalize.
 export const pendingDrafts = [
     { id: "d1", patientId: "MV-08943", type: "Consultation note" },
