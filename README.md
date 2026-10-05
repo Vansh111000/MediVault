@@ -80,5 +80,3 @@ Build an operating system for clinics that centralizes every patient's medical j
 - **Organize** — classify uploaded documents (prescription, blood test, imaging report, consultation note, discharge summary, etc.)
 
 > AI extracts → Human verifies → Record is saved. AI output is always informational, never a diagnosis.
-
-## Cross-Hospital Consent Flow
