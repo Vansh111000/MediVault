@@ -87,7 +87,7 @@ export default function Footer() {
                     </p>
 
                     <p className="font-body-sm text-on-surface-variant">
-                        © 2024 MediVault Health Systems Inc. All rights reserved.
+                        © 2026 MediVault Health Systems Inc. All rights reserved.
                     </p>
                 </div>
             </div>

@@ -1,27 +1,158 @@
-import Header from "./components/Header";
-import Hero from "./components/Hero";
-import TrustSection from "./components/TrustSection";
-import HowItWorks from "./components/HowItWorks";
-import AIFeatures from "./components/AIFeatures";
-import PrivacyConsent from "./components/PrivacyConsent";
-import CTA from "./components/CTA";
-import Footer from "./components/Footer";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 
-export default function App() {
-  return (
-    <div className="bg-background font-body-md text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
-      <Header />
+import { AppProvider } from "./context/AppContext";
+import { LandingPageView } from "./components/LandingPage/LandingPageView";
+import { AuthPage } from "./components/Auth/AuthPage";
+import { PatientDashboard } from "./components/PatientView/PatientDashboard";
+import { ReceptionistDashboard } from "./components/ReceptionistView/ReceptionistDashboard";
+import { ToastContainer } from "./components/Shared/ToastContainer";
 
-      <main className="w-full pt-20 bg-background">
-        <Hero />
-        <TrustSection />
-        <HowItWorks />
-        <AIFeatures />
-        <PrivacyConsent />
-        <CTA />
-      </main>
+import DoctorLayout from "./layouts/DoctorLayout";
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import PatientWorkspace from "./pages/doctor/PatientWorkspace";
+import MedicalRecordsTab from "./pages/doctor/patient-workspace/MedicalRecordsTab";
+import ConsultationTab from "./pages/doctor/patient-workspace/ConsultationTab";
+import MedicalRecords from "./pages/doctor/MedicalRecords";
+import Consultations from "./pages/doctor/Consultations";
+import Prescriptions from "./pages/doctor/Prescriptions";
 
-      <Footer />
-    </div>
-  );
+const DoctorPortal = ({ onNavigateHome }) => {
+    return (
+        <Routes>
+            <Route path="/doctor" element={<DoctorLayout onNavigateHome={onNavigateHome} />}>
+                <Route index element={<DoctorDashboard />} />
+
+                <Route path="patients/:patientId" element={<PatientWorkspace />}>
+                    <Route
+                        index
+                        element={<Navigate to="consultation" replace />}
+                    />
+
+                    <Route
+                        path="consultation"
+                        element={<ConsultationTab />}
+                    />
+
+                    <Route
+                        path="records"
+                        element={<MedicalRecordsTab />}
+                    />
+
+                    <Route
+                        path="summary"
+                        element={
+                            <Navigate to="../consultation" replace />
+                        }
+                    />
+
+                    <Route
+                        path="prescription"
+                        element={
+                            <Navigate to="../consultation" replace />
+                        }
+                    />
+                </Route>
+
+                <Route path="records" element={<MedicalRecords />} />
+
+                <Route path="consultations" element={<Consultations />} />
+
+                <Route path="prescriptions" element={<Prescriptions />} />
+            </Route>
+        </Routes>
+    );
+};
+
+const MainLayout = () => {
+    const navigate = useNavigate();
+
+    const [currentView, setCurrentView] = useState("landing");
+    const [authMode, setAuthMode] = useState("login");
+
+    const handleOpenAuth = (mode = "login") => {
+        setAuthMode(mode);
+        setCurrentView("auth");
+    };
+
+    const handleNavigateToPortal = () => {
+        setCurrentView("patient");
+    };
+
+    const handleNavigateToDoctor = () => {
+        setCurrentView("doctor");
+        navigate("/doctor");
+    };
+
+    const handleNavigateToReceptionist = () => {
+        setCurrentView("receptionist");
+    };
+
+    const handleNavigateHome = () => {
+        setCurrentView("landing");
+        navigate("/");
+    };
+
+    const handleAuthSuccess = (role) => {
+        if (role === "doctor") {
+            handleNavigateToDoctor();
+        } else if (role === "receptionist") {
+            setCurrentView("receptionist");
+        } else {
+            setCurrentView("patient");
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-[#f8fafc] text-slate-900 selection:bg-teal-600 selection:text-white">
+
+            {currentView === "landing" && (
+                <LandingPageView
+                    onOpenAuth={handleOpenAuth}
+                    onNavigateToDoctor={handleNavigateToDoctor}
+                    onNavigateToAssistant={handleNavigateToReceptionist}
+                    onNavigateToPortal={handleNavigateToPortal}
+                />
+            )}
+
+            {currentView === "auth" && (
+                <AuthPage
+                    initialMode={authMode}
+                    onBack={handleNavigateHome}
+                    onAuthSuccess={handleAuthSuccess}
+                />
+            )}
+
+            {currentView === "doctor" && (
+                <DoctorPortal onNavigateHome={handleNavigateHome} />
+            )}
+
+            {currentView === "patient" && (
+                <PatientDashboard
+                    onLogout={handleNavigateHome}
+                    onNavigateToDoctor={handleNavigateToDoctor}
+                />
+            )}
+
+            {currentView === "receptionist" && (
+                <ReceptionistDashboard
+                    onNavigateHome={handleNavigateHome}
+                />
+            )}
+
+            <ToastContainer />
+        </div>
+    );
+};
+
+function App() {
+    return (
+        <AppProvider>
+            <BrowserRouter>
+                <MainLayout />
+            </BrowserRouter>
+        </AppProvider>
+    );
 }
+
+export default App;
