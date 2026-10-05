@@ -1,5 +1,5 @@
 import { Shield, ArrowLeft, LogOut } from "lucide-react";
-import { doctor } from "../../data/mockDoctorData";
+import { doctor } from "../../data/mockData";
 
 export default function DoctorHeader({ onNavigateHome }) {
     const initials = doctor.shortName

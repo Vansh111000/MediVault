@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Icon from "../../components/Icon";
-import { patients } from "../../data/mockDoctorData";
-import { medicalRecords, formatDate } from "../../data/mockClinicalData";
+import { patients, medicalRecords, formatDate } from "../../data/mockData";
 
 const recordTypes = {
     consultation: { label: "Consultation", icon: "stethoscope", tone: "bg-teal-50 text-teal-700 border border-teal-200/60" },
@@ -91,7 +90,7 @@ export default function MedicalRecords() {
                                     </span>
                                 </div>
                                 <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                    {patient.age} yrs • {patient.sex} • Blood group {patient.bloodGroup}
+                                    {patient.age} yrs • {patient.gender} • Blood group {patient.bloodGroup}
                                 </p>
                             </div>
                         </div>

@@ -1,5 +1,5 @@
 import Icon from "../../../components/Icon";
-import { initialConsultations, initialPrescriptions, formatDate } from "../../../data/mockClinicalData";
+import { initialConsultations, initialPrescriptions, formatDate } from "../../../data/mockData";
 import { toDisplayVisitType } from "../../../components/doctor/patientDisplay";
 
 function Row({ label, children }) {

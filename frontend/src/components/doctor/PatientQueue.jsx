@@ -146,7 +146,7 @@ export default function PatientQueue({ patients }) {
                                                     )}
                                                 </div>
                                                 <span className="text-[11px] text-slate-500 font-medium">
-                                                    {patient.age} yrs • {patient.sex} • {patient.bloodGroup}
+                                                    {patient.age} yrs • {patient.gender} • {patient.bloodGroup}
                                                 </span>
                                             </div>
                                         </div>

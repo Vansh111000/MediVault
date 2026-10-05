@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Icon from "../../components/Icon";
-import { patients } from "../../data/mockDoctorData";
-import { initialConsultations, todayISO, formatDate } from "../../data/mockClinicalData";
+import { patients, initialConsultations, todayISO, formatDate } from "../../data/mockData";
 
 const VISIT_TYPES = ["Follow-up", "New Consultation", "Specialist Review", "Lab Review"];
 

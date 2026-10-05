@@ -3,9 +3,8 @@ import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import StatusBadge from "../../components/doctor/StatusBadge";
 import { toDisplayStatus, toDisplayVisitType } from "../../components/doctor/patientDisplay";
-import { patients } from "../../data/mockDoctorData";
+import { patients, createMedicine, getAllergyLabel, getBodyMeasurements } from "../../data/mockData";
 import VisitSummary from "./patient-workspace/VisitSummary";
-import { createMedicine, getAllergyLabel, getBodyMeasurements } from "../../data/mockClinicalData";
 
 const tabs = [
     { label: "Consultation", to: "consultation", icon: "stethoscope" },
@@ -65,7 +64,7 @@ function WorkspaceBody({ patient }) {
     const { height, weight } = getBodyMeasurements(patient);
     const profileDetails = [
         { label: "Age", value: `${patient.age} yrs` },
-        { label: "Sex", value: patient.sex },
+        { label: "Sex", value: patient.gender },
         { label: "Height", value: height },
         { label: "Weight", value: weight },
         { label: "Blood Group", value: patient.bloodGroup },

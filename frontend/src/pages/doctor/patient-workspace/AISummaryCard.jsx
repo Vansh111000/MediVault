@@ -1,11 +1,10 @@
 import { useState } from "react";
 import Icon from "../../../components/Icon";
-import { patientsRecords } from "../../../data/mockMedicalRecords";
-import { formatDate } from "../../../data/mockClinicalData";
+import { patientsRecords, formatDate } from "../../../data/mockData";
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// Builds the summary from the patient's existing mock records (mockMedicalRecords.js).
+// Builds the summary from the patient's existing mock records (patientsRecords in mockData.js).
 function buildSummary(patient, allergyLabel) {
     const records = patientsRecords[patient.id];
 
@@ -148,7 +147,7 @@ function buildSummary(patient, allergyLabel) {
     }
 
     // Overview
-    const sex = patient.sex.toLowerCase();
+    const sex = patient.gender.toLowerCase();
 
     let overview = `${patient.name} is a ${patient.age}-year-old ${sex}.`;
 

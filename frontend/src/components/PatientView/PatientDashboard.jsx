@@ -29,7 +29,7 @@ export const PatientDashboard = ({ onLogout }) => {
   const [selectedRecordDetail, setSelectedRecordDetail] = useState(null);
 
   // Filter records for this patient
-  const patientRecords = records.filter(r => r.patientId === currentPatient.id || r.patientId === 'PAT-1001');
+  const patientRecords = records.filter(r => r.patientId === currentPatient.id);
 
   // Extract all medications
   const allMedications = patientRecords

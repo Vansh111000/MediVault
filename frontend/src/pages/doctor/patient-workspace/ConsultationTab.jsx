@@ -3,8 +3,7 @@ import { Link, useOutletContext } from "react-router-dom";
 import Icon from "../../../components/Icon";
 import AISummaryCard from "./AISummaryCard";
 import PrescriptionSection from "./PrescriptionSection";
-import { doctor } from "../../../data/mockDoctorData";
-import { todayISO, formatDate } from "../../../data/mockClinicalData";
+import { doctor, todayISO, formatDate } from "../../../data/mockData";
 
 const inputClass = (error) =>
     `w-full px-3 py-2 bg-slate-50 border text-slate-900 rounded-xl text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${

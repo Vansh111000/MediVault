@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import Icon from "../../../components/Icon";
-import { patientsRecords } from "../../../data/mockMedicalRecords";
-import { formatDate } from "../../../data/mockClinicalData";
+import { patientsRecords, formatDate } from "../../../data/mockData";
 
 const SAMPLE_NOTE = "Sample data for demonstration only.";
 

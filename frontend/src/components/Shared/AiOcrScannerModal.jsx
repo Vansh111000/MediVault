@@ -3,7 +3,7 @@ import { X, Scan, Sparkles, FileText, CheckCircle2, ArrowRight, Upload, AlertCir
 import { useApp } from '../../context/AppContext';
 
 export const AiOcrScannerModal = ({ isOpen, onClose, patientId, onApplyExtractedData }) => {
-  const { uploadDocumentRecord, showToast, ocrSamples } = useApp();
+  const { uploadDocumentRecord, showToast, ocrSamples, currentPatient } = useApp();
   const [selectedPreset, setSelectedPreset] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [scannedResult, setScannedResult] = useState(null);
@@ -28,7 +28,7 @@ export const AiOcrScannerModal = ({ isOpen, onClose, patientId, onApplyExtracted
     if (!scannedResult) return;
 
     uploadDocumentRecord({
-      patientId: patientId || 'PAT-1001',
+      patientId: patientId || currentPatient?.id,
       title: `${currentPreset.type}: ${currentPreset.title}`,
       category: currentPreset.type === 'Prescription' ? 'Prescription' : 'Lab Report',
       extractedData: scannedResult

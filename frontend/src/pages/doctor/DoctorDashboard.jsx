@@ -1,7 +1,7 @@
 import { useState } from "react";
 import StatCard from "../../components/doctor/StatCard";
 import PatientQueue from "../../components/doctor/PatientQueue";
-import { doctor, patients, pendingDrafts } from "../../data/mockDoctorData";
+import { doctor, patients, pendingDrafts } from "../../data/mockData";
 
 function getGreeting(date) {
     const hour = date.getHours();

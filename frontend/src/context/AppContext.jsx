@@ -8,86 +8,73 @@ import {
   ACTIVE_VISITS,
   CONSENT_REQUESTS,
   AUDIT_TRAIL,
-  MOCK_OCR_SAMPLES
+  MOCK_OCR_SAMPLES,
+  DEFAULT_SESSION,
+  INITIAL_NOTIFICATIONS
 } from '../data/mockData';
 
 const AppContext = createContext();
+
+// Versioned so data cached from older mock-data layouts (old patient IDs) is not reused.
+const STORAGE_PREFIX = 'medivault_v2_';
 
 export const AppProvider = ({ children }) => {
   // Roles: 'patient' | 'doctor' | 'assistant' | 'admin'
   const [currentRole, setCurrentRole] = useState('patient');
   
   // Active Entities
-  const [activeHospitalId, setActiveHospitalId] = useState('HOSP-002'); // St. Jude Medical Center
-  const [activePatientId, setActivePatientId] = useState('PAT-1001'); // Alex Mercer
-  const [activeDoctorId, setActiveDoctorId] = useState('DOC-002'); // Dr. Arvind Patel
-  const [activeAssistantId, setActiveAssistantId] = useState('AST-001'); // Elena Cruz
+  const [activeHospitalId, setActiveHospitalId] = useState(DEFAULT_SESSION.hospitalId);
+  const [activePatientId, setActivePatientId] = useState(DEFAULT_SESSION.patientId);
+  const [activeDoctorId, setActiveDoctorId] = useState(DEFAULT_SESSION.doctorId);
+  const [activeAssistantId, setActiveAssistantId] = useState(DEFAULT_SESSION.assistantId);
 
   // State Stores
   const [hospitals] = useState(HOSPITALS);
   const [doctors] = useState(DOCTORS);
   const [assistants] = useState(ASSISTANTS);
   const [patients, setPatients] = useState(() => {
-    const saved = localStorage.getItem('medivault_patients');
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}patients`);
     return saved ? JSON.parse(saved) : PATIENTS;
   });
   const [records, setRecords] = useState(() => {
-    const saved = localStorage.getItem('medivault_records');
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}records`);
     return saved ? JSON.parse(saved) : MEDICAL_RECORDS;
   });
   const [activeVisits, setActiveVisits] = useState(() => {
-    const saved = localStorage.getItem('medivault_visits');
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}visits`);
     return saved ? JSON.parse(saved) : ACTIVE_VISITS;
   });
   const [consentRequests, setConsentRequests] = useState(() => {
-    const saved = localStorage.getItem('medivault_consents');
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}consents`);
     return saved ? JSON.parse(saved) : CONSENT_REQUESTS;
   });
   const [auditLogs, setAuditLogs] = useState(() => {
-    const saved = localStorage.getItem('medivault_audit');
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}audit`);
     return saved ? JSON.parse(saved) : AUDIT_TRAIL;
   });
 
   const [toasts, setToasts] = useState([]);
-  const [notifications, setNotifications] = useState([
-    {
-      id: 'NOTIF-1',
-      title: 'Access Request from St. Jude Medical Center',
-      message: 'Dr. Arvind Patel requested temporary 4-hour visit access to your past cardiology and lab records.',
-      type: 'consent_request',
-      requestId: 'REQ-CONSENT-890',
-      time: '10 mins ago',
-      read: false
-    },
-    {
-      id: 'NOTIF-2',
-      title: 'New Consultation Record Added',
-      message: 'Metro General Hospital uploaded your quarterly hypertension review and prescription.',
-      type: 'new_record',
-      time: 'Yesterday',
-      read: true
-    }
-  ]);
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
 
   // Persist modifications
   useEffect(() => {
-    localStorage.setItem('medivault_patients', JSON.stringify(patients));
+    localStorage.setItem(`${STORAGE_PREFIX}patients`, JSON.stringify(patients));
   }, [patients]);
 
   useEffect(() => {
-    localStorage.setItem('medivault_records', JSON.stringify(records));
+    localStorage.setItem(`${STORAGE_PREFIX}records`, JSON.stringify(records));
   }, [records]);
 
   useEffect(() => {
-    localStorage.setItem('medivault_visits', JSON.stringify(activeVisits));
+    localStorage.setItem(`${STORAGE_PREFIX}visits`, JSON.stringify(activeVisits));
   }, [activeVisits]);
 
   useEffect(() => {
-    localStorage.setItem('medivault_consents', JSON.stringify(consentRequests));
+    localStorage.setItem(`${STORAGE_PREFIX}consents`, JSON.stringify(consentRequests));
   }, [consentRequests]);
 
   useEffect(() => {
-    localStorage.setItem('medivault_audit', JSON.stringify(auditLogs));
+    localStorage.setItem(`${STORAGE_PREFIX}audit`, JSON.stringify(auditLogs));
   }, [auditLogs]);
 
   // Derived current objects
@@ -131,13 +118,13 @@ export const AppProvider = ({ children }) => {
   const switchRole = (role) => {
     setCurrentRole(role);
     if (role === 'doctor') {
-      setActiveDoctorId(DOCTORS[1].id); // Dr. Arvind Patel at St. Jude
-      setActiveHospitalId(DOCTORS[1].hospitalId);
+      setActiveDoctorId(DEFAULT_SESSION.doctorId);
+      setActiveHospitalId(DOCTORS.find(d => d.id === DEFAULT_SESSION.doctorId).hospitalId);
     } else if (role === 'assistant') {
-      setActiveAssistantId(ASSISTANTS[0].id); // Elena Cruz at St. Jude
+      setActiveAssistantId(ASSISTANTS[0].id);
       setActiveHospitalId(ASSISTANTS[0].hospitalId);
     } else if (role === 'patient') {
-      setActivePatientId(PATIENTS[0].id); // Alex Mercer
+      setActivePatientId(DEFAULT_SESSION.patientId);
     } else if (role === 'admin') {
       setActiveHospitalId(HOSPITALS[0].id);
     }
@@ -145,9 +132,13 @@ export const AppProvider = ({ children }) => {
 
   // Create new patient account (by assistant or patient)
   const registerPatient = (patientData) => {
-    const newId = `PAT-${Math.floor(1000 + Math.random() * 9000)}`;
+    // One ID per patient: the MediVault ID is also the record ID.
+    let newId;
+    do {
+      newId = `MV-${Math.floor(10000 + Math.random() * 90000)}`;
+    } while (patients.some(p => p.id === newId));
     const newAbha = `91-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newMvId = `MV-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newMvId = newId;
 
     const newPatient = {
       id: newId,
@@ -188,6 +179,11 @@ export const AppProvider = ({ children }) => {
     return newPatient;
   };
 
+  // Hospitals that hold records for a patient (from the shared record store)
+  const getSharedHospitals = (patientId) => [
+    ...new Set(records.filter(r => r.patientId === patientId).map(r => r.hospitalName).filter(Boolean))
+  ];
+
   // Hospital Check-In & Doctor Assignment
   const checkInPatient = ({ patientId, doctorId, priority = 'Routine', reason = 'General Consultation', triageVitals = {} }) => {
     const patient = patients.find(p => p.id === patientId);
@@ -226,7 +222,7 @@ export const AppProvider = ({ children }) => {
         status: 'APPROVED_ACTIVE',
         grantedAt: existingConsent.grantedAt,
         expiresAt: existingConsent.expiresAt,
-        sharedHospitals: ['Metro General Hospital', 'Apollo Health Clinic', 'St. Jude Medical Center'],
+        sharedHospitals: getSharedHospitals(patientId),
         consentScope: 'Full Cross-Hospital Medical History'
       } : {
         status: 'PENDING_AUTHORIZATION',
@@ -332,7 +328,7 @@ export const AppProvider = ({ children }) => {
               status: 'APPROVED_ACTIVE',
               grantedAt: now.toISOString(),
               expiresAt: expiry.toISOString(),
-              sharedHospitals: ['Metro General Hospital', 'Apollo Health Clinic', 'Trinity Diagnostic Lab'],
+              sharedHospitals: getSharedHospitals(request.patientId),
               consentScope: 'Full Cross-Hospital Medical History'
             }
           };
@@ -511,11 +507,11 @@ export const AppProvider = ({ children }) => {
 
   // Reset demo state
   const resetDemoData = () => {
-    localStorage.removeItem('medivault_patients');
-    localStorage.removeItem('medivault_records');
-    localStorage.removeItem('medivault_visits');
-    localStorage.removeItem('medivault_consents');
-    localStorage.removeItem('medivault_audit');
+    localStorage.removeItem(`${STORAGE_PREFIX}patients`);
+    localStorage.removeItem(`${STORAGE_PREFIX}records`);
+    localStorage.removeItem(`${STORAGE_PREFIX}visits`);
+    localStorage.removeItem(`${STORAGE_PREFIX}consents`);
+    localStorage.removeItem(`${STORAGE_PREFIX}audit`);
     setPatients(PATIENTS);
     setRecords(MEDICAL_RECORDS);
     setActiveVisits(ACTIVE_VISITS);

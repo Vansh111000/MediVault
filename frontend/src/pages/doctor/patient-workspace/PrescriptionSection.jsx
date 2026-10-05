@@ -1,5 +1,5 @@
 import Icon from "../../../components/Icon";
-import { FREQUENCIES, createMedicine } from "../../../data/mockClinicalData";
+import { FREQUENCIES, createMedicine } from "../../../data/mockData";
 
 const inputClass = (error) =>
     `w-full px-3 py-2 bg-slate-50 border text-slate-900 rounded-xl text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
