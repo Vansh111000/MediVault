@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Icon from "../../../components/Icon";
 import { patientsRecords, formatDate } from "../../../data/mockData";
+import api from "../../../services/api";
 
 const SAMPLE_NOTE = "Sample data for demonstration only.";
 
@@ -81,12 +82,42 @@ const flagStyles = {
 export default function MedicalRecordsTab() {
     const { patientId } = useParams();
     const records = patientsRecords[patientId];
+    const [backendRecords, setBackendRecords] = useState(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        api.getPatientMedicalHistory(patientId)
+            .then((res) => {
+                if (isMounted && res?.data) {
+                    setBackendRecords(res.data);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            isMounted = false;
+        };
+    }, [patientId]);
 
     // Which record cards are expanded (by record id). Read-only: nothing is edited.
     const [openIds, setOpenIds] = useState({});
     const toggle = (id) => setOpenIds((prev) => ({ ...prev, [id]: !prev[id] }));
 
-    const consultations = records?.consultations ?? [];
+    const backendConsultations =
+        backendRecords?.consultations?.map((c) => ({
+            id: c._id,
+            date: c.completedAt ? c.completedAt.split("T")[0] : c.createdAt ? c.createdAt.split("T")[0] : "2026-08-12",
+            doctor: c.doctor?.name || "Attending Physician",
+            hospital: c.hospital?.name || "Hospital",
+            visitType: "Outpatient Encounter",
+            reason: c.reason || "Clinical Consultation",
+            symptoms: c.clinicalNote,
+            examination: "Clinical examination documented",
+            diagnosis: "Documented in letterhead note",
+            treatment: c.clinicalNote,
+            amendments: c.amendments,
+        })) || [];
+
+    const consultations = [...backendConsultations, ...(records?.consultations ?? [])];
     const prescriptions = records?.prescriptions ?? [];
     const bloodReports = records?.bloodReports ?? [];
     const otherReports = records?.otherReports ?? [];

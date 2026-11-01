@@ -1,73 +1,141 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { HOSPITALS } from '../../data/mockData';
-import { Shield, ArrowLeft, User, Stethoscope, ClipboardList, CheckCircle2, Lock, Mail, Phone, Calendar, Heart, Building2 } from 'lucide-react';
+import {
+  Shield,
+  ArrowLeft,
+  User,
+  Stethoscope,
+  ClipboardList,
+  Lock,
+  Mail,
+  Building2,
+  KeyRound,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles
+} from 'lucide-react';
 import { Footer } from '../Shared/Footer';
 
 export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
-  const { switchRole, registerPatient, doctors, patients, showToast } = useApp();
+  const {
+    login,
+    registerStaff,
+    claimPatientAccount,
+    hospitals,
+    showToast
+  } = useApp();
 
-  const [mode, setMode] = useState(initialMode); // 'login' or 'signup'
-  const [selectedRole, setSelectedRole] = useState('patient'); // 'patient', 'doctor', 'receptionist'
+  // Mode: 'login' | 'signup' (staff only) | 'claim' (patient account activation)
+  const [mode, setMode] = useState(initialMode);
+  const [selectedRole, setSelectedRole] = useState('patient'); // 'patient' | 'doctor' | 'receptionist'
+  const [loading, setLoading] = useState(false);
 
   // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState('Male');
-  const [bloodGroup, setBloodGroup] = useState('O+');
-  const [medicalHistory, setMedicalHistory] = useState('');
-  const [selectedHospital, setSelectedHospital] = useState(HOSPITALS[0].name);
-  const [doctorSpecialty, setDoctorSpecialty] = useState('General Medicine & Surgery');
+  const [selectedHospitalId, setSelectedHospitalId] = useState(hospitals[0]?.id || hospitals[0]?._id || '');
+  const [doctorSpecialty, setDoctorSpecialty] = useState('Cardiology & Attending Physician');
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
 
-  const handleSubmit = (e) => {
+  // Patient Activation Form states
+  const [mediVaultId, setMediVaultId] = useState('');
+  const [activationCode, setActivationCode] = useState('');
+
+  // Quick fill helper for demo accounts
+  const handleQuickFill = (role) => {
+    setSelectedRole(role);
+    setMode('login');
+    if (role === 'doctor') {
+      setEmail('doctor@medivault.com');
+      setPassword('Password123!');
+    } else if (role === 'receptionist') {
+      setEmail('reception@medivault.com');
+      setPassword('Password123!');
+    } else if (role === 'patient') {
+      setEmail('patient@medivault.com');
+      setPassword('Password123!');
+    }
+  };
+
+  const handleQuickFillClaim = () => {
+    setMode('claim');
+    setSelectedRole('patient');
+    setMediVaultId('MV-20002');
+    setActivationCode('ACT-771920');
+    setEmail('rohan.activated@example.com');
+    setPassword('Password123!');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    if (mode === 'signup') {
-      if (!name) {
-        showToast('Error', 'Please enter your name', 'error');
-        return;
-      }
+    try {
+      if (mode === 'claim') {
+        // Patient Claim / Activation Flow
+        if (!mediVaultId || !activationCode || !password) {
+          showToast('Validation Error', 'MediVault ID, activation code and password are required', 'error');
+          setLoading(false);
+          return;
+        }
 
-      if (selectedRole === 'patient') {
-        const newPatient = registerPatient({
-          name,
-          age: parseInt(age, 10) || 28,
-          gender,
-          bloodGroup,
-          phone: phone || '+1 (555) 234-5678',
-          email: email || `${name.toLowerCase().replace(/\s+/g, '')}@example.com`,
-          chronicConditions: medicalHistory ? medicalHistory.split(',').map(c => c.trim()) : ['None recorded']
+        await claimPatientAccount({
+          mediVaultId: mediVaultId.trim().toUpperCase(),
+          activationCode: activationCode.trim(),
+          password,
+          email: email || undefined
         });
-        switchRole('patient');
-        showToast('Welcome to MediVault', `Account created successfully for ${name}!`, 'success');
+
         onAuthSuccess('patient');
-      } else if (selectedRole === 'doctor') {
-        switchRole('doctor');
-        showToast('Doctor Profile Active', `Welcome Dr. ${name}, affiliated with ${selectedHospital}!`, 'success');
-        onAuthSuccess('doctor');
+      } else if (mode === 'signup') {
+        // Staff Registration Flow (Patients cannot self-register!)
+        if (selectedRole === 'patient') {
+          showToast(
+            'Patient Notice',
+            'Patients cannot self-register online. Please visit hospital reception or activate your issued MediVault ID.',
+            'error'
+          );
+          setLoading(false);
+          return;
+        }
+
+        if (!name || !email || !password) {
+          showToast('Validation Error', 'Please complete all required fields', 'error');
+          setLoading(false);
+          return;
+        }
+
+        await registerStaff({
+          name,
+          email,
+          password,
+          role: selectedRole === 'receptionist' ? 'receptionist' : 'doctor',
+          hospitalId: selectedHospitalId || hospitals[0]?.id || hospitals[0]?._id,
+          specialty: selectedRole === 'doctor' ? doctorSpecialty : undefined,
+          licenseNumber: selectedRole === 'doctor' ? licenseNumber || `MED-${Math.floor(10000 + Math.random() * 90000)}` : undefined,
+          employeeId: selectedRole === 'receptionist' ? employeeId || `EMP-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+          phone
+        });
+
+        onAuthSuccess(selectedRole);
       } else {
-        switchRole('assistant');
-        showToast('Receptionist Desk Active', `Welcome ${name} at ${selectedHospital}!`, 'success');
-        onAuthSuccess('receptionist');
+        // Login Flow (All roles)
+        if (!email || !password) {
+          showToast('Validation Error', 'Please enter your email or ID and password', 'error');
+          setLoading(false);
+          return;
+        }
+
+        const res = await login(email, password);
+        onAuthSuccess(res.role || selectedRole);
       }
-    } else {
-      // Login mode
-      if (selectedRole === 'doctor') {
-        switchRole('doctor');
-        showToast('Signed In', `Welcome back, ${doctors[0]?.name || 'Doctor'}!`, 'success');
-        onAuthSuccess('doctor');
-      } else if (selectedRole === 'receptionist') {
-        switchRole('assistant');
-        showToast('Signed In', 'Welcome back to Hospital Frontdesk / Reception!', 'success');
-        onAuthSuccess('receptionist');
-      } else {
-        switchRole('patient');
-        showToast('Signed In', `Welcome back, ${patients[0]?.name || 'Patient'}!`, 'success');
-        onAuthSuccess('patient');
-      }
+    } catch (err) {
+      console.error('Auth error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -97,69 +165,178 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
           {/* Header */}
           <div className="text-center space-y-1">
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              {mode === 'login' ? 'Sign In to MediVault' : 'Create an Account'}
+              {mode === 'login'
+                ? 'Sign In to MediVault'
+                : mode === 'claim'
+                ? 'Activate Patient Account'
+                : 'Register Medical Staff'}
             </h2>
             <p className="text-xs text-slate-500">
               {mode === 'login'
-                ? 'Select your role to access your dedicated workspace'
-                : 'Enter your details to register on the platform'}
+                ? 'Select your role to access your workspace'
+                : mode === 'claim'
+                ? 'Enter your clinic-issued MediVault ID and verification code'
+                : 'Register an authorized hospital doctor or receptionist profile'}
             </p>
           </div>
 
-          {/* Role Selector Tabs */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">Select Role</label>
-            <div className="grid grid-cols-3 gap-2">
+          {/* Quick Demo Credentials Bar */}
+          <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+              <span className="flex items-center gap-1 text-teal-800">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Demo Quick-Fill Accounts:</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                onClick={() => setSelectedRole('patient')}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all ${
-                  selectedRole === 'patient'
-                    ? 'border-teal-700 bg-slate-100 text-slate-900 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600'
-                }`}
+                onClick={() => handleQuickFill('doctor')}
+                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 transition-colors"
               >
-                <User className="w-5 h-5 mb-1 text-teal-700" />
-                <span>Patient</span>
+                🩺 Doctor
               </button>
-
               <button
                 type="button"
-                onClick={() => setSelectedRole('doctor')}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all ${
-                  selectedRole === 'doctor'
-                    ? 'border-teal-700 bg-slate-100 text-slate-900 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600'
-                }`}
+                onClick={() => handleQuickFill('receptionist')}
+                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 transition-colors"
               >
-                <Stethoscope className="w-5 h-5 mb-1 text-teal-700" />
-                <span>Doctor</span>
+                📋 Reception
               </button>
-
               <button
                 type="button"
-                onClick={() => setSelectedRole('receptionist')}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all ${
-                  selectedRole === 'receptionist'
-                    ? 'border-teal-700 bg-slate-100 text-slate-900 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600'
-                }`}
+                onClick={() => handleQuickFill('patient')}
+                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 transition-colors"
               >
-                <ClipboardList className="w-5 h-5 mb-1 text-teal-700" />
-                <span>Receptionist</span>
+                👤 Patient (Aarav)
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickFillClaim}
+                className="px-2 py-1 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg text-[10px] font-semibold text-teal-800 transition-colors"
+              >
+                🔑 Claim Demo Patient
               </button>
             </div>
           </div>
 
+          {/* Role Selector Tabs (Only in login and staff signup mode) */}
+          {mode !== 'claim' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Workspace Role</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('patient')}
+                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all ${
+                    selectedRole === 'patient'
+                      ? 'border-teal-700 bg-slate-100 text-slate-900 shadow-xs'
+                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600'
+                  }`}
+                >
+                  <User className="w-5 h-5 mb-1 text-teal-700" />
+                  <span>Patient</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('doctor')}
+                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all ${
+                    selectedRole === 'doctor'
+                      ? 'border-teal-700 bg-slate-100 text-slate-900 shadow-xs'
+                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600'
+                  }`}
+                >
+                  <Stethoscope className="w-5 h-5 mb-1 text-teal-700" />
+                  <span>Doctor</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('receptionist')}
+                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all ${
+                    selectedRole === 'receptionist'
+                      ? 'border-teal-700 bg-slate-100 text-slate-900 shadow-xs'
+                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600'
+                  }`}
+                >
+                  <ClipboardList className="w-5 h-5 mb-1 text-teal-700" />
+                  <span>Receptionist</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Notice when Patient role is selected in Sign Up mode */}
+          {mode === 'signup' && selectedRole === 'patient' && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
+              <div className="flex items-center gap-1.5 font-bold">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Patient Registration Policy</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-800">
+                To prevent duplicate identities and ensure verified medical ownership, <strong>patients cannot self-register online</strong>.
+                Your permanent MediVault ID is issued in-person by an authorized hospital assistant.
+              </p>
+              <button
+                type="button"
+                onClick={() => setMode('claim')}
+                className="w-full mt-1 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-colors"
+              >
+                I have a MediVault ID & Code → Activate Now
+              </button>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
+            {/* CLAIM MODE: MediVault ID + Activation Code */}
+            {mode === 'claim' && (
+              <>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    MediVault Permanent ID *
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. MV-20002"
+                      value={mediVaultId}
+                      onChange={(e) => setMediVaultId(e.target.value.toUpperCase())}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 uppercase font-mono font-bold focus:outline-none focus:border-teal-600 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Activation Code (From Clinic Slip) *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. ACT-771920"
+                      value={activationCode}
+                      onChange={(e) => setActivationCode(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-teal-600 transition-colors"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* SIGNUP MODE: Full Name for Staff */}
+            {mode === 'signup' && selectedRole !== 'patient' && (
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Full Name</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Full Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder={selectedRole === 'doctor' ? 'Dr. Sarah Sharma' : 'e.g. Aarav Mehta'}
+                  placeholder={selectedRole === 'doctor' ? 'Dr. Sarah Sharma' : 'Staff Member Name'}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600 transition-colors"
@@ -167,133 +344,143 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
               </div>
             )}
 
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                {selectedRole === 'doctor' ? 'Doctor ID or Email' : selectedRole === 'receptionist' ? 'Staff ID or Email' : 'Email or Patient ID'}
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder={
-                    selectedRole === 'doctor'
-                      ? 'dr.sharma@medivault.com'
-                      : selectedRole === 'receptionist'
-                      ? 'reception@citycare.com'
-                      : 'aarav.mehta@gmail.com'
-                  }
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* Hospital Selection for Doctor & Receptionist */}
-            {mode === 'signup' && (selectedRole === 'doctor' || selectedRole === 'receptionist') && (
+            {/* Email Field */}
+            {!(mode === 'signup' && selectedRole === 'patient') && (
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Select Hospital / Medical Institution * ({HOSPITALS.length} Available)
+                  {mode === 'login'
+                    ? 'Email Address or MediVault ID'
+                    : 'Account Email Address *'}
                 </label>
                 <div className="relative">
-                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <select
-                    value={selectedHospital}
-                    onChange={(e) => setSelectedHospital(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700 transition-colors"
-                  >
-                    {HOSPITALS.map((h) => (
-                      <option key={h.id} value={h.name}>
-                        {h.name} • {h.location}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {mode === 'signup' && selectedRole === 'patient' && (
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Age</label>
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="number"
-                    placeholder="34"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-teal-600"
+                    type="text"
+                    required={mode !== 'claim'}
+                    placeholder={
+                      selectedRole === 'doctor'
+                        ? 'doctor@medivault.com'
+                        : selectedRole === 'receptionist'
+                        ? 'reception@medivault.com'
+                        : 'patient@medivault.com or MV-10001'
+                    }
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600 transition-colors"
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Hospital Selection for Staff Signup */}
+            {mode === 'signup' && selectedRole !== 'patient' && (
+              <>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Gender</label>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full px-2 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-teal-600"
-                  >
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
-                  </select>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Affiliated Hospital ({hospitals.length} Available) *
+                  </label>
+                  <div className="relative">
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <select
+                      value={selectedHospitalId}
+                      onChange={(e) => setSelectedHospitalId(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700 transition-colors"
+                    >
+                      {hospitals.map((h) => (
+                        <option key={h.id || h._id} value={h.id || h._id}>
+                          {h.name} • {h.city || h.location}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Blood</label>
-                  <select
-                    value={bloodGroup}
-                    onChange={(e) => setBloodGroup(e.target.value)}
-                    className="w-full px-2 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-teal-600"
-                  >
-                    <option>O+</option>
-                    <option>O-</option>
-                    <option>A+</option>
-                    <option>A-</option>
-                    <option>B+</option>
-                    <option>B-</option>
-                    <option>AB+</option>
-                    <option>AB-</option>
-                  </select>
+
+                {selectedRole === 'doctor' && (
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Specialty *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Cardiology & Critical Care"
+                      value={doctorSpecialty}
+                      onChange={(e) => setDoctorSpecialty(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-teal-600"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Password Field */}
+            {!(mode === 'signup' && selectedRole === 'patient') && (
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  {mode === 'claim' ? 'Create Secure Password *' : 'Password *'}
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600 transition-colors"
+                  />
                 </div>
               </div>
             )}
 
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Password</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600 transition-colors"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md shadow-teal-950/10 flex items-center justify-center gap-2 mt-2"
-            >
-              <span>{mode === 'login' ? `Sign In as ${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}` : 'Create Account & Proceed'}</span>
-            </button>
+            {/* Submit Button */}
+            {!(mode === 'signup' && selectedRole === 'patient') && (
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-bold text-xs py-3 rounded-xl transition-all shadow-md shadow-teal-950/10 flex items-center justify-center gap-2 mt-2"
+              >
+                {loading ? (
+                  <span>Processing...</span>
+                ) : mode === 'login' ? (
+                  <span>Sign In as {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}</span>
+                ) : mode === 'claim' ? (
+                  <span>Activate & Login Patient</span>
+                ) : (
+                  <span>Register {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} Account</span>
+                )}
+              </button>
+            )}
           </form>
 
-          {/* Toggle between Sign In and Sign Up */}
-          <div className="text-center pt-2 border-t border-slate-100">
+          {/* Toggle between Sign In, Staff Sign Up, and Claim Account */}
+          <div className="text-center pt-2 border-t border-slate-100 space-y-1.5">
             {mode === 'login' ? (
-              <p className="text-xs text-slate-500">
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setMode('signup')}
-                  className="font-bold text-teal-700 hover:underline"
-                >
-                  Sign Up
-                </button>
-              </p>
+              <>
+                <p className="text-xs text-slate-500">
+                  New staff member?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('signup');
+                      setSelectedRole('doctor');
+                    }}
+                    className="font-bold text-teal-700 hover:underline"
+                  >
+                    Register Staff
+                  </button>
+                </p>
+                <p className="text-xs text-slate-500">
+                  Patient with hospital slip?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setMode('claim')}
+                    className="font-bold text-teal-700 hover:underline"
+                  >
+                    Activate Patient Account
+                  </button>
+                </p>
+              </>
             ) : (
               <p className="text-xs text-slate-500">
-                Already have an account?{' '}
+                Already have an activated account?{' '}
                 <button
                   type="button"
                   onClick={() => setMode('login')}
@@ -307,7 +494,6 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
         </div>
       </main>
 
-      {/* Clean Footer */}
       <Footer />
     </div>
   );

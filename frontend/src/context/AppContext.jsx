@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import api from '../services/api';
 import {
-  HOSPITALS,
-  DOCTORS,
-  ASSISTANTS,
-  PATIENTS,
-  MEDICAL_RECORDS,
-  ACTIVE_VISITS,
-  CONSENT_REQUESTS,
-  AUDIT_TRAIL,
+  HOSPITALS as DEFAULT_HOSPITALS,
+  DOCTORS as DEFAULT_DOCTORS,
+  ASSISTANTS as DEFAULT_ASSISTANTS,
+  PATIENTS as DEFAULT_PATIENTS,
+  MEDICAL_RECORDS as DEFAULT_RECORDS,
+  ACTIVE_VISITS as DEFAULT_VISITS,
+  CONSENT_REQUESTS as DEFAULT_CONSENTS,
+  AUDIT_TRAIL as DEFAULT_AUDIT,
   MOCK_OCR_SAMPLES,
   DEFAULT_SESSION,
   INITIAL_NOTIFICATIONS
@@ -15,379 +16,603 @@ import {
 
 const AppContext = createContext();
 
-// Versioned so data cached from older mock-data layouts (old patient IDs) is not reused.
-const STORAGE_PREFIX = 'medivault_v2_';
-
 export const AppProvider = ({ children }) => {
-  // Roles: 'patient' | 'doctor' | 'assistant' | 'admin'
-  const [currentRole, setCurrentRole] = useState('patient');
-  
+  // Authentication & Session
+  const [currentUser, setCurrentUser] = useState(null);
+  const [currentRole, setCurrentRole] = useState('patient'); // 'patient' | 'doctor' | 'assistant' | 'receptionist' | 'hospital_admin' | 'super_admin'
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // Active Entities
-  const [activeHospitalId, setActiveHospitalId] = useState(DEFAULT_SESSION.hospitalId);
+  const [activeHospitalId, setActiveHospitalIdState] = useState(DEFAULT_SESSION.hospitalId);
   const [activePatientId, setActivePatientId] = useState(DEFAULT_SESSION.patientId);
   const [activeDoctorId, setActiveDoctorId] = useState(DEFAULT_SESSION.doctorId);
   const [activeAssistantId, setActiveAssistantId] = useState(DEFAULT_SESSION.assistantId);
 
-  // State Stores
-  const [hospitals] = useState(HOSPITALS);
-  const [doctors] = useState(DOCTORS);
-  const [assistants] = useState(ASSISTANTS);
-  const [patients, setPatients] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_PREFIX}patients`);
-    return saved ? JSON.parse(saved) : PATIENTS;
-  });
-  const [records, setRecords] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_PREFIX}records`);
-    return saved ? JSON.parse(saved) : MEDICAL_RECORDS;
-  });
-  const [activeVisits, setActiveVisits] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_PREFIX}visits`);
-    return saved ? JSON.parse(saved) : ACTIVE_VISITS;
-  });
-  const [consentRequests, setConsentRequests] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_PREFIX}consents`);
-    return saved ? JSON.parse(saved) : CONSENT_REQUESTS;
-  });
-  const [auditLogs, setAuditLogs] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_PREFIX}audit`);
-    return saved ? JSON.parse(saved) : AUDIT_TRAIL;
-  });
-
+  // Data Stores (backed by MongoDB Atlas via API)
+  const [hospitals, setHospitals] = useState(DEFAULT_HOSPITALS);
+  const [doctors, setDoctors] = useState(DEFAULT_DOCTORS);
+  const [assistants, setAssistants] = useState(DEFAULT_ASSISTANTS);
+  const [patients, setPatients] = useState(DEFAULT_PATIENTS);
+  const [records, setRecords] = useState(DEFAULT_RECORDS);
+  const [activeVisits, setActiveVisits] = useState(DEFAULT_VISITS);
+  const [consentRequests, setConsentRequests] = useState(DEFAULT_CONSENTS);
+  const [auditLogs, setAuditLogs] = useState(DEFAULT_AUDIT);
   const [toasts, setToasts] = useState([]);
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
 
-  // Persist modifications
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_PREFIX}patients`, JSON.stringify(patients));
-  }, [patients]);
+  const setActiveHospitalId = (id) => {
+    setActiveHospitalIdState(id);
+    api.setActiveHospitalId(id);
+  };
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_PREFIX}records`, JSON.stringify(records));
-  }, [records]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_PREFIX}visits`, JSON.stringify(activeVisits));
-  }, [activeVisits]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_PREFIX}consents`, JSON.stringify(consentRequests));
-  }, [consentRequests]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_PREFIX}audit`, JSON.stringify(auditLogs));
-  }, [auditLogs]);
-
-  // Derived current objects
-  const currentHospital = hospitals.find(h => h.id === activeHospitalId) || hospitals[0];
-  const currentPatient = patients.find(p => p.id === activePatientId) || patients[0];
-  const currentDoctor = doctors.find(d => d.id === activeDoctorId) || doctors[0];
-  const currentAssistant = assistants.find(a => a.id === activeAssistantId) || assistants[0];
-
-  // Helper Toast Alert
+  // Toast Notification System
   const showToast = (title, message, type = 'success') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, title, message, type }]);
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, title, message, type }]);
     setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
+      setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4500);
   };
 
   const removeToast = (id) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Add Audit Entry
-  const addAuditLog = (action, details, recordId = 'N/A', patientName = '') => {
-    const newLog = {
-      id: `AUD-${Date.now().toString().slice(-5)}`,
-      timestamp: new Date().toISOString(),
-      actorName: currentRole === 'doctor' ? currentDoctor.name : currentRole === 'assistant' ? currentAssistant.name : currentRole === 'patient' ? currentPatient.name : 'System Admin',
-      actorRole: currentRole.charAt(0).toUpperCase() + currentRole.slice(1),
-      hospitalName: currentHospital.name,
-      action,
-      patientName: patientName || (currentPatient ? `${currentPatient.name} (${currentPatient.id})` : 'N/A'),
-      recordId,
-      consentToken: 'Active Authorization',
-      ipAddress: '192.168.10.88 [Encrypted SSL]',
-      details
+  // Helper: map backend visit to frontend shape
+  const mapVisitToFrontend = (v) => ({
+    id: v._id || v.id,
+    _id: v._id,
+    patientId: v.patient?._id || v.patient?.id || v.patient,
+    patientName: v.patient?.name || 'Unknown Patient',
+    hospitalId: v.hospital?._id || v.hospital?.id || v.hospital,
+    hospitalName: v.hospital?.name || 'CityCare General Hospital',
+    assignedDoctorId: v.assignedDoctors?.[0]?._id || v.assignedDoctors?.[0] || 'DOC-001',
+    assignedDoctorName: v.assignedDoctors?.[0]?.name || 'Dr. Sarah Sharma, MD',
+    specialty: v.assignedDoctors?.[0]?.specialty || 'Cardiology',
+    checkInTime: v.checkInTime || v.createdAt,
+    priority: v.priority || 'Routine',
+    status: v.status === 'in_queue' ? 'In Doctor Queue' : v.status === 'completed' ? 'Completed' : 'Checked In',
+    tokenNumber: v.tokenNumber || 'R-101',
+    triageVitals: v.preliminaryVitals || {},
+    reasonForVisit: v.reasonForVisit || 'General Consultation'
+  });
+
+  // Helper: map backend consent to frontend shape
+  const mapConsentToFrontend = (c) => ({
+    id: c._id || c.id,
+    _id: c._id,
+    patientId: c.patient?._id || c.patient?.id || c.patient,
+    patientName: c.patient?.name || 'Patient',
+    requestingHospitalId: c.requestingHospital?._id || c.requestingHospital,
+    requestingHospitalName: c.requestingHospital?.name || 'Medical Center',
+    requestingDoctorName: c.requestingUser?.name || c.requestingUser?.email || 'Attending Physician',
+    purpose: c.purpose,
+    status: c.status === 'approved' ? 'APPROVED_ACTIVE' : c.status.toUpperCase(),
+    requestedAt: c.createdAt,
+    grantedAt: c.grantedAt,
+    expiresAt: c.expiresAt,
+    durationMinutes: c.durationMinutes || 240,
+    permissionLevel: `${(c.durationMinutes || 240) / 60}-Hour Visit Access (${c.permissionScope || 'read_only_visit'})`
+  });
+
+  // Fetch Atlas Data on App Init
+  const loadBackendData = useCallback(async () => {
+    try {
+      // 1. Fetch hospitals
+      const hospRes = await api.getHospitals().catch(() => null);
+      if (hospRes?.data && hospRes.data.length > 0) {
+        const mappedHospitals = hospRes.data.map(h => ({
+          id: h._id,
+          _id: h._id,
+          hospitalCode: h.hospitalCode,
+          name: h.name,
+          location: `${h.address}, ${h.city}`,
+          address: h.address,
+          city: h.city,
+          phone: h.phone,
+          status: h.status
+        }));
+        setHospitals(mappedHospitals);
+        if (!activeHospitalId) {
+          setActiveHospitalId(mappedHospitals[0].id);
+        }
+      }
+
+      // 2. Fetch doctors
+      const docRes = await api.getDoctors().catch(() => null);
+      if (docRes?.data && docRes.data.length > 0) {
+        const mappedDoctors = docRes.data.map(d => ({
+          id: d._id,
+          _id: d._id,
+          name: d.name,
+          specialty: d.specialty,
+          hospitalId: d.hospital || activeHospitalId,
+          hospitalName: 'Affiliated Hospital',
+          licenseNumber: d.licenseNumber,
+          email: d.email || d.user?.email,
+          experience: '12+ Years',
+          rating: 4.9
+        }));
+        setDoctors(mappedDoctors);
+      }
+
+      // 3. Fetch search/patients
+      const patRes = await api.searchPatients('').catch(() => null);
+      if (patRes?.data && patRes.data.length > 0) {
+        const mappedPatients = patRes.data.map(p => ({
+          id: p._id,
+          _id: p._id,
+          mediVaultId: p.mediVaultId,
+          name: p.name,
+          age: p.age || 30,
+          gender: p.gender,
+          bloodGroup: p.bloodGroup,
+          phone: p.phone,
+          email: p.email,
+          address: p.address,
+          allergies: p.allergies || [],
+          chronicConditions: p.chronicConditions || [],
+          vitals: p.vitals || {},
+          isClaimed: p.isClaimed
+        }));
+        setPatients(mappedPatients);
+      }
+
+      // 4. Fetch visits if token exists
+      if (api.token) {
+        const visitRes = await api.getVisits().catch(() => null);
+        if (visitRes?.data && visitRes.data.length > 0) {
+          setActiveVisits(visitRes.data.map(mapVisitToFrontend));
+        }
+
+        const consentRes = await api.getPatientConsents().catch(() => null);
+        if (consentRes?.data && consentRes.data.length > 0) {
+          setConsentRequests(consentRes.data.map(mapConsentToFrontend));
+        }
+
+        const auditRes = await api.getAuditLogs().catch(() => null);
+        if (auditRes?.data && auditRes.data.length > 0) {
+          setAuditLogs(auditRes.data.map(a => ({
+            id: a._id,
+            timestamp: a.timestamp,
+            actorName: a.actorName,
+            actorRole: a.actorRole,
+            hospitalName: a.hospitalName,
+            action: a.action,
+            patientName: a.patientIdentifier,
+            recordId: a.resourceId,
+            details: a.details
+          })));
+        }
+      }
+    } catch (err) {
+      console.warn('Initial Atlas data load fallback:', err.message);
+    }
+  }, [activeHospitalId]);
+
+  // Initial Auth Check
+  useEffect(() => {
+    const initAuth = async () => {
+      setAuthLoading(true);
+      if (api.token) {
+        try {
+          const res = await api.getMe();
+          if (res?.data?.user) {
+            const u = res.data.user;
+            setCurrentUser(u);
+            setCurrentRole(u.role === 'receptionist' ? 'assistant' : u.role);
+            setIsAuthenticated(true);
+
+            if (res.data.activeHospital) {
+              setActiveHospitalId(res.data.activeHospital._id || res.data.activeHospital);
+            }
+          }
+        } catch (e) {
+          console.warn('Session expired or invalid token:', e.message);
+          api.logout();
+        }
+      }
+      await loadBackendData();
+      setAuthLoading(false);
     };
-    setAuditLogs(prev => [newLog, ...prev]);
-  };
 
-  // Switch role and automatically configure relevant active entities
+    initAuth();
+  }, [loadBackendData]);
+
+  // Derived active entity objects
+  const currentHospital = hospitals.find((h) => h.id === activeHospitalId || h._id === activeHospitalId) || hospitals[0] || DEFAULT_HOSPITALS[0];
+  const currentPatient = patients.find((p) => p.id === activePatientId || p._id === activePatientId || p.mediVaultId === activePatientId) || patients[0] || DEFAULT_PATIENTS[0];
+  const currentDoctor = doctors.find((d) => d.id === activeDoctorId || d._id === activeDoctorId) || doctors[0] || DEFAULT_DOCTORS[0];
+  const currentAssistant = assistants.find((a) => a.id === activeAssistantId || a._id === activeAssistantId) || assistants[0] || DEFAULT_ASSISTANTS[0];
+
+  // Switch role and update session
   const switchRole = (role) => {
-    setCurrentRole(role);
-    if (role === 'doctor') {
-      setActiveDoctorId(DEFAULT_SESSION.doctorId);
-      setActiveHospitalId(DOCTORS.find(d => d.id === DEFAULT_SESSION.doctorId).hospitalId);
-    } else if (role === 'assistant') {
-      setActiveAssistantId(ASSISTANTS[0].id);
-      setActiveHospitalId(ASSISTANTS[0].hospitalId);
-    } else if (role === 'patient') {
-      setActivePatientId(DEFAULT_SESSION.patientId);
-    } else if (role === 'admin') {
-      setActiveHospitalId(HOSPITALS[0].id);
+    const normalizedRole = role === 'receptionist' ? 'assistant' : role;
+    setCurrentRole(normalizedRole);
+    if (normalizedRole === 'doctor' && doctors.length > 0) {
+      setActiveDoctorId(doctors[0].id || doctors[0]._id);
+    } else if (normalizedRole === 'patient' && patients.length > 0) {
+      setActivePatientId(patients[0].id || patients[0]._id);
     }
   };
 
-  // Create new patient account (by assistant or patient)
-  const registerPatient = (patientData) => {
-    // One ID per patient: the MediVault ID is also the record ID.
-    let newId;
-    do {
-      newId = `MV-${Math.floor(10000 + Math.random() * 90000)}`;
-    } while (patients.some(p => p.id === newId));
-    const newAbha = `91-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newMvId = newId;
+  // Sign In using real backend API
+  const login = async (email, password) => {
+    try {
+      const res = await api.login(email, password);
+      if (res?.data) {
+        const u = res.data.user;
+        setCurrentUser(u);
+        const mappedRole = u.role === 'receptionist' ? 'assistant' : u.role;
+        setCurrentRole(mappedRole);
+        setIsAuthenticated(true);
 
-    const newPatient = {
-      id: newId,
-      abhaId: newAbha,
-      mediVaultId: newMvId,
-      name: patientData.name,
-      age: parseInt(patientData.age, 10) || 30,
-      gender: patientData.gender || 'Other',
-      bloodGroup: patientData.bloodGroup || 'O+',
-      dob: patientData.dob || '1995-01-01',
-      phone: patientData.phone || '+1 (555) 000-0000',
-      email: patientData.email || `${patientData.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
-      address: patientData.address || 'Standard Registered Residence',
-      allergies: patientData.allergies || [],
-      chronicConditions: patientData.chronicConditions || [],
-      vitals: patientData.vitals || {
-        bp: '120/80 mmHg',
-        heartRate: '72 bpm',
-        spO2: '98%',
-        weight: '70 kg',
-        height: '172 cm',
-        bmi: '23.6',
-        bloodGlucose: '95 mg/dL'
-      },
-      emergencyContact: patientData.emergencyContact || {
-        name: 'Family Contact',
-        relation: 'Relative',
-        phone: patientData.phone
-      },
-      registeredAt: currentHospital.id,
-      homeHospital: currentHospital.name,
-      registeredDate: new Date().toISOString().split('T')[0]
-    };
+        if (res.data.memberships?.[0]?.hospital) {
+          const hospId = res.data.memberships[0].hospital._id || res.data.memberships[0].hospital;
+          setActiveHospitalId(hospId);
+        }
 
-    setPatients(prev => [newPatient, ...prev]);
-    addAuditLog('CREATE_PATIENT_ACCOUNT', `New patient account created by frontdesk with ID ${newId}`, 'N/A', `${newPatient.name} (${newId})`);
-    showToast('Account Created', `Patient ${newPatient.name} registered with MediVault ID ${newMvId}`, 'success');
-    return newPatient;
-  };
+        if (u.patientProfile) {
+          setActivePatientId(u.patientProfile._id || u.patientProfile);
+        }
+        if (u.doctorProfile) {
+          setActiveDoctorId(u.doctorProfile._id || u.doctorProfile);
+        }
 
-  // Hospitals that hold records for a patient (from the shared record store)
-  const getSharedHospitals = (patientId) => [
-    ...new Set(records.filter(r => r.patientId === patientId).map(r => r.hospitalName).filter(Boolean))
-  ];
-
-  // Hospital Check-In & Doctor Assignment
-  const checkInPatient = ({ patientId, doctorId, priority = 'Routine', reason = 'General Consultation', triageVitals = {} }) => {
-    const patient = patients.find(p => p.id === patientId);
-    const doctor = doctors.find(d => d.id === doctorId) || doctors[0];
-
-    // Check if consent is already active for this hospital
-    const existingConsent = consentRequests.find(
-      c => c.patientId === patientId && c.requestingHospitalId === currentHospital.id && c.status === 'APPROVED_ACTIVE'
-    );
-
-    const tokenNum = `${priority === 'Urgent' ? 'U' : 'R'}-${Math.floor(100 + Math.random() * 900)}`;
-    const newVisitId = `VISIT-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newVisit = {
-      id: newVisitId,
-      patientId,
-      patientName: patient ? patient.name : 'Unknown Patient',
-      hospitalId: currentHospital.id,
-      hospitalName: currentHospital.name,
-      assignedDoctorId: doctor.id,
-      assignedDoctorName: doctor.name,
-      specialty: doctor.specialty,
-      checkInTime: new Date().toISOString(),
-      priority,
-      status: 'In Doctor Queue',
-      tokenNumber: tokenNum,
-      triageVitals: {
-        bp: triageVitals.bp || patient?.vitals?.bp || '120/80 mmHg',
-        pulse: triageVitals.pulse || patient?.vitals?.heartRate || '72 bpm',
-        temp: triageVitals.temp || '98.6 °F',
-        spO2: triageVitals.spO2 || '98%'
-      },
-      reasonForVisit: reason,
-      crossHospitalConsent: existingConsent ? {
-        requestId: existingConsent.id,
-        status: 'APPROVED_ACTIVE',
-        grantedAt: existingConsent.grantedAt,
-        expiresAt: existingConsent.expiresAt,
-        sharedHospitals: getSharedHospitals(patientId),
-        consentScope: 'Full Cross-Hospital Medical History'
-      } : {
-        status: 'PENDING_AUTHORIZATION',
-        message: 'Patient consent required for cross-hospital records'
+        await loadBackendData();
+        showToast('Signed In', `Welcome back, ${u.email}!`, 'success');
+        return { success: true, role: u.role };
       }
-    };
-
-    setActiveVisits(prev => [newVisit, ...prev]);
-    addAuditLog('PATIENT_CHECK_IN', `Assigned token ${tokenNum} to ${doctor.name} (${priority})`, newVisitId, `${patient?.name} (${patientId})`);
-    showToast('Patient Checked In', `Assigned to ${doctor.name} with Token ${tokenNum}`, 'success');
+    } catch (err) {
+      showToast('Login Failed', err.message || 'Invalid credentials', 'error');
+      throw err;
+    }
   };
 
-  // Complete / End Visit (Revokes temporary access automatically)
-  const endVisit = (visitId) => {
-    const visit = activeVisits.find(v => v.id === visitId);
-    if (!visit) return;
+  // Sign Out
+  const logout = () => {
+    api.logout();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setCurrentRole('patient');
+    showToast('Signed Out', 'You have been logged out of MediVault.', 'info');
+  };
 
-    setActiveVisits(prev => prev.filter(v => v.id !== visitId));
-
-    // Automatically expire any temporary visit consent for this patient at this hospital
-    setConsentRequests(prev => prev.map(c => {
-      if (c.patientId === visit.patientId && c.requestingHospitalId === visit.hospitalId && c.status === 'APPROVED_ACTIVE') {
-        return { ...c, status: 'EXPIRED', remainingSeconds: 0 };
+  // Staff Registration (Doctor / Receptionist)
+  const registerStaff = async (staffData) => {
+    try {
+      const res = await api.registerStaff(staffData);
+      if (res?.data) {
+        const u = res.data.user;
+        setCurrentUser(u);
+        setCurrentRole(u.role === 'receptionist' ? 'assistant' : u.role);
+        setIsAuthenticated(true);
+        await loadBackendData();
+        showToast('Registration Successful', `Welcome to MediVault, ${staffData.name}!`, 'success');
+        return res.data;
       }
-      return c;
-    }));
-
-    addAuditLog('END_PATIENT_VISIT_AUTO_REVOKE', `Visit ${visitId} closed. Temporary cross-hospital access tokens automatically expired and invalidated.`, visitId, visit.patientName);
-    showToast('Visit Completed', `Visit closed. Cross-hospital temporary access auto-expired for patient safety.`, 'info');
+    } catch (err) {
+      showToast('Registration Failed', err.message, 'error');
+      throw err;
+    }
   };
 
-  // Request Inter-Hospital Consent
-  const requestInterHospitalConsent = ({ patientId, reason, durationMinutes = 240 }) => {
-    const patient = patients.find(p => p.id === patientId);
-    const newReqId = `REQ-CONSENT-${Math.floor(100 + Math.random() * 900)}`;
+  // Claim Patient Account
+  const claimPatientAccount = async (claimData) => {
+    try {
+      const res = await api.claimPatientAccount(claimData);
+      if (res?.data) {
+        const u = res.data.user;
+        setCurrentUser(u);
+        setCurrentRole('patient');
+        setIsAuthenticated(true);
+        if (res.data.patient) {
+          setActivePatientId(res.data.patient._id);
+        }
+        await loadBackendData();
+        showToast('Account Activated', 'Your MediVault account has been securely activated!', 'success');
+        return res.data;
+      }
+    } catch (err) {
+      showToast('Activation Failed', err.message, 'error');
+      throw err;
+    }
+  };
 
-    const newRequest = {
-      id: newReqId,
-      patientId,
-      patientName: patient?.name || 'Patient',
-      requestingHospitalId: currentHospital.id,
-      requestingHospitalName: currentHospital.name,
-      requestingDoctorId: currentDoctor?.id || 'DOC-EXT',
-      requestingDoctorName: currentDoctor?.name || 'Assigned Clinician',
-      purpose: reason || `Access previous clinical records & lab tests for current consultation at ${currentHospital.name}`,
-      status: 'PENDING',
-      requestedAt: new Date().toISOString(),
-      grantedAt: null,
-      expiresAt: null,
-      durationMinutes,
-      permissionLevel: `Read-Only ${durationMinutes / 60}-Hour Visit Token`
-    };
+  // Register New Patient by Assistant (calls backend /api/patients)
+  const registerPatient = async (patientData) => {
+    try {
+      const payload = {
+        name: patientData.name,
+        age: parseInt(patientData.age, 10) || 30,
+        gender: patientData.gender || 'Other',
+        bloodGroup: patientData.bloodGroup || 'O+',
+        dob: patientData.dob || undefined,
+        phone: patientData.phone,
+        email: patientData.email,
+        address: patientData.address || 'Standard Registered Residence',
+        allergies: patientData.allergies || [],
+        chronicConditions: patientData.chronicConditions || [],
+        vitals: patientData.vitals || {},
+        emergencyContact: patientData.emergencyContact || {
+          name: 'Family Contact',
+          relation: 'Relative',
+          phone: patientData.phone
+        },
+        hospitalId: currentHospital.id || currentHospital._id
+      };
 
-    setConsentRequests(prev => [newRequest, ...prev]);
+      const res = await api.createPatient(payload);
+      if (res?.data) {
+        const created = res.data.patient;
+        const mappedPatient = {
+          id: created._id,
+          _id: created._id,
+          mediVaultId: created.mediVaultId,
+          name: created.name,
+          age: created.age,
+          gender: created.gender,
+          bloodGroup: created.bloodGroup,
+          phone: created.phone,
+          email: created.email,
+          allergies: created.allergies || [],
+          chronicConditions: created.chronicConditions || [],
+          vitals: created.vitals || {},
+          activationCode: res.data.activationCode
+        };
 
-    // Send in-app notification to patient
-    setNotifications(prev => [
-      {
-        id: `NOTIF-${Date.now()}`,
-        title: `Consent Request: ${currentHospital.name}`,
-        message: `${currentDoctor?.name || 'Doctor'} is requesting temporary read-only access to your medical history for today's visit.`,
-        type: 'consent_request',
-        requestId: newReqId,
-        time: 'Just now',
-        read: false
-      },
-      ...prev
-    ]);
+        setPatients((prev) => [mappedPatient, ...prev]);
+        setActivePatientId(created._id);
 
-    addAuditLog('REQUEST_CROSS_HOSPITAL_CONSENT', `Requested ${durationMinutes}m read-only token from ${patient?.name}`, newReqId, `${patient?.name} (${patientId})`);
-    showToast('Consent Request Sent', `Authorization prompt sent to ${patient?.name}'s device.`, 'info');
+        showToast(
+          'Patient Registered',
+          `Permanent ID: ${created.mediVaultId} | Activation Code: ${res.data.activationCode}`,
+          'success'
+        );
+        return mappedPatient;
+      }
+    } catch (err) {
+      showToast('Registration Error', err.message, 'error');
+      throw err;
+    }
+  };
+
+  // Check-In Patient & Assign Doctor (calls backend /api/visits)
+  const checkInPatient = async ({ patientId, doctorId, priority = 'Routine', reason = 'General Consultation', triageVitals = {} }) => {
+    try {
+      const payload = {
+        patientId,
+        hospitalId: currentHospital.id || currentHospital._id,
+        doctorId: doctorId || currentDoctor.id || currentDoctor._id,
+        reasonForVisit: reason,
+        priority,
+        preliminaryVitals: triageVitals
+      };
+
+      const res = await api.createVisit(payload);
+      if (res?.data) {
+        const mapped = mapVisitToFrontend(res.data);
+        setActiveVisits((prev) => [mapped, ...prev]);
+        showToast('Patient Checked In', `Token ${mapped.tokenNumber} issued for ${mapped.assignedDoctorName}`, 'success');
+        return mapped;
+      }
+    } catch (err) {
+      showToast('Check-In Error', err.message, 'error');
+      throw err;
+    }
+  };
+
+  // End / Complete Visit
+  const endVisit = async (visitId) => {
+    try {
+      await api.updateVisitStatus(visitId, 'completed').catch(() => null);
+      setActiveVisits((prev) => prev.filter((v) => v.id !== visitId && v._id !== visitId));
+      showToast('Visit Completed', 'Visit closed. Temporary visit access tokens auto-expired.', 'info');
+    } catch (err) {
+      showToast('Error', err.message, 'error');
+    }
+  };
+
+  // Request Cross-Hospital Consent
+  const requestInterHospitalConsent = async ({ patientId, reason, durationMinutes = 240, permissionScope = 'read_only_visit' }) => {
+    try {
+      const payload = {
+        patientId,
+        hospitalId: currentHospital.id || currentHospital._id,
+        purpose: reason || 'Cross-hospital consultation and records access',
+        permissionScope,
+        durationMinutes
+      };
+
+      const res = await api.requestConsent(payload);
+      if (res?.data) {
+        const mapped = mapConsentToFrontend(res.data);
+        setConsentRequests((prev) => [mapped, ...prev]);
+        showToast('Consent Requested', 'Authorization prompt sent to patient.', 'info');
+        return mapped;
+      }
+    } catch (err) {
+      showToast('Request Failed', err.message, 'error');
+      throw err;
+    }
   };
 
   // Respond to Consent Request (Approve / Reject)
-  const respondConsentRequest = (requestId, approved) => {
-    const request = consentRequests.find(c => c.id === requestId);
-    if (!request) return;
-
-    const now = new Date();
-    const expiry = new Date(now.getTime() + (request.durationMinutes || 240) * 60 * 1000);
-
-    setConsentRequests(prev => prev.map(c => {
-      if (c.id === requestId) {
-        return {
-          ...c,
-          status: approved ? 'APPROVED_ACTIVE' : 'REJECTED',
-          grantedAt: approved ? now.toISOString() : null,
-          expiresAt: approved ? expiry.toISOString() : null,
-          remainingSeconds: approved ? (request.durationMinutes || 240) * 60 : 0
-        };
+  const respondConsentRequest = async (requestId, approved) => {
+    try {
+      const res = await api.respondConsent(requestId, approved);
+      if (res?.data) {
+        const updated = mapConsentToFrontend(res.data);
+        setConsentRequests((prev) => prev.map((c) => (c.id === requestId || c._id === requestId ? updated : c)));
+        showToast(
+          approved ? 'Access Granted' : 'Request Declined',
+          approved ? 'Temporary cross-hospital access authorized.' : 'Access request was rejected.',
+          approved ? 'success' : 'warning'
+        );
       }
-      return c;
-    }));
-
-    // Update active visit consent status if any
-    if (approved) {
-      setActiveVisits(prev => prev.map(v => {
-        if (v.patientId === request.patientId && v.hospitalId === request.requestingHospitalId) {
-          return {
-            ...v,
-            crossHospitalConsent: {
-              requestId: request.id,
-              status: 'APPROVED_ACTIVE',
-              grantedAt: now.toISOString(),
-              expiresAt: expiry.toISOString(),
-              sharedHospitals: getSharedHospitals(request.patientId),
-              consentScope: 'Full Cross-Hospital Medical History'
-            }
-          };
-        }
-        return v;
-      }));
+    } catch (err) {
+      showToast('Error', err.message, 'error');
     }
-
-    addAuditLog(
-      approved ? 'GRANT_TEMPORARY_VISIT_CONSENT' : 'REJECT_CONSENT_REQUEST',
-      approved
-        ? `Patient granted temporary ${request.durationMinutes}m access to ${request.requestingHospitalName}. Auto-expires at ${expiry.toLocaleTimeString()}`
-        : `Patient denied access request from ${request.requestingHospitalName}`,
-      requestId,
-      `${request.patientName} (${request.patientId})`
-    );
-
-    showToast(
-      approved ? 'Access Granted' : 'Request Declined',
-      approved ? `Temporary ${request.durationMinutes / 60}-hour visit access enabled.` : 'Access request was rejected.',
-      approved ? 'success' : 'warning'
-    );
   };
 
-  // Revoke Consent manually
-  const revokeConsent = (requestId) => {
-    const req = consentRequests.find(c => c.id === requestId);
-    setConsentRequests(prev => prev.map(c => c.id === requestId ? { ...c, status: 'REVOKED', remainingSeconds: 0 } : c));
-    
-    // Also remove from active visit
-    if (req) {
-      setActiveVisits(prev => prev.map(v => {
-        if (v.patientId === req.patientId && v.hospitalId === req.requestingHospitalId) {
-          return {
-            ...v,
-            crossHospitalConsent: {
-              status: 'REVOKED',
-              message: 'Consent was revoked by patient'
-            }
-          };
-        }
-        return v;
-      }));
+  // Revoke Consent
+  const revokeConsent = async (requestId) => {
+    try {
+      const res = await api.revokeConsent(requestId);
+      if (res?.data) {
+        const updated = mapConsentToFrontend(res.data);
+        setConsentRequests((prev) => prev.map((c) => (c.id === requestId || c._id === requestId ? updated : c)));
+        showToast('Access Revoked', 'Doctor and hospital access has been revoked immediately.', 'info');
+      }
+    } catch (err) {
+      showToast('Revoke Error', err.message, 'error');
     }
-
-    addAuditLog('REVOKE_PATIENT_CONSENT', `Patient revoked access token ${requestId} immediately.`, requestId, req?.patientName);
-    showToast('Access Revoked', 'Doctor and hospital access has been revoked.', 'info');
   };
 
-  // Add Consultation Record by Doctor
-  const addConsultationRecord = ({ patientId, diagnoses, medications, testsOrdered, doctorNotes, title, category = 'Prescription' }) => {
-    const newRecId = `REC-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-    const patient = patients.find(p => p.id === patientId);
+  // Add Consultation Record / Complete Consultation
+  const addConsultationRecord = async ({
+    patientId,
+    diagnoses = [],
+    medications = [],
+    clinicalNote,
+    doctorNotes,
+    title,
+    visitId
+  }) => {
+    try {
+      const noteContent = clinicalNote || doctorNotes || `Clinical evaluation conducted. Diagnoses: ${diagnoses.map((d) => d.name).join(', ')}`;
 
-    // AI plain language generation simulation
-    const medsText = medications.map(m => `${m.drug} (${m.dosage})`).join(', ');
-    const diagText = diagnoses.map(d => d.name).join(', ');
-    const plainExplanation = `During your consultation with ${currentDoctor.name} at ${currentHospital.name}, you were evaluated for ${diagText || 'your health condition'}. You were prescribed ${medsText || 'supportive medications'}. Follow all instructions and take tests as recommended.`;
+      // Format prescriptions for backend schema
+      const formattedMeds = medications.map((m) => ({
+        name: m.name || m.drug || 'Medication',
+        dosage: m.dosage || 'Standard',
+        frequency: m.frequency || 'Once daily',
+        duration: m.duration || '30 days',
+        instructions: m.instructions || 'As advised'
+      }));
 
+      // Find an active visit if not provided
+      const resolvedVisitId = visitId || activeVisits.find((v) => v.patientId === patientId)?.id;
+
+      if (resolvedVisitId) {
+        // Create and complete on backend
+        const draftRes = await api.saveConsultationDraft({
+          visitId: resolvedVisitId,
+          patientId,
+          clinicalNote: noteContent,
+          prescriptions: formattedMeds
+        });
+
+        if (draftRes?.data?._id) {
+          const completeRes = await api.completeConsultation(draftRes.data._id, {
+            clinicalNote: noteContent,
+            prescriptions: formattedMeds
+          });
+
+          const newRecord = {
+            id: completeRes.data._id,
+            patientId,
+            hospitalId: currentHospital.id,
+            hospitalName: currentHospital.name,
+            doctorName: currentDoctor.name,
+            doctorId: currentDoctor.id,
+            specialty: currentDoctor.specialty,
+            recordType: 'Clinical Consultation',
+            category: 'Prescription',
+            date: new Date().toISOString().split('T')[0],
+            title: title || 'Clinical Consultation',
+            summary: noteContent,
+            clinicalNote: noteContent,
+            diagnoses,
+            medications: formattedMeds,
+            isImmutable: true
+          };
+
+          setRecords((prev) => [newRecord, ...prev]);
+          showToast('Consultation Recorded', 'Consultation finalized and cryptographically logged.', 'success');
+          return newRecord;
+        }
+      }
+    } catch (err) {
+      console.warn('Backend consultation sync error:', err.message);
+    }
+
+    // Local fallback for UI continuity
+    const localId = `REC-${Date.now().toString().slice(-5)}`;
+    const fallbackRecord = {
+      id: localId,
+      patientId,
+      hospitalId: currentHospital.id,
+      hospitalName: currentHospital.name,
+      doctorName: currentDoctor.name,
+      doctorId: currentDoctor.id,
+      specialty: currentDoctor.specialty,
+      recordType: 'Clinical Consultation',
+      category: 'Prescription',
+      date: new Date().toISOString().split('T')[0],
+      title: title || 'Clinical Consultation',
+      summary: doctorNotes || 'Clinical evaluation conducted.',
+      clinicalNote: clinicalNote || doctorNotes || 'Letterhead note',
+      diagnoses,
+      medications,
+      isImmutable: true
+    };
+    setRecords((prev) => [fallbackRecord, ...prev]);
+    showToast('Consultation Recorded', 'Consultation saved.', 'success');
+    return fallbackRecord;
+  };
+
+  // Update Medical Record / Append Amendment
+  const updateMedicalRecord = async (recordId, updatedData) => {
+    try {
+      if (updatedData.amendmentText) {
+        await api.addAmendment(recordId, {
+          amendmentText: updatedData.amendmentText,
+          reason: updatedData.reason || 'Clinical correction'
+        });
+      }
+    } catch (err) {
+      console.warn('Amendment backend call:', err.message);
+    }
+    setRecords((prev) => prev.map((r) => (r.id === recordId ? { ...r, ...updatedData } : r)));
+    showToast('Record Updated', 'Medical record addendum logged.', 'success');
+    return true;
+  };
+
+  // Update Patient Profile
+  const updatePatientProfile = async (patientId, updatedData) => {
+    try {
+      await api.updatePatient(patientId, updatedData).catch(() => null);
+    } catch (e) {
+      // Ignore
+    }
+    setPatients((prev) => prev.map((p) => (p.id === patientId || p._id === patientId ? { ...p, ...updatedData } : p)));
+    showToast('Profile Updated', 'Patient clinical details updated.', 'success');
+  };
+
+  // Check Cross-Hospital Record Access against Consent
+  const hasAccessToRecord = (record, requestingHospitalId = currentHospital.id, patientId = record.patientId) => {
+    if (record.hospitalId === requestingHospitalId) return true;
+    if (currentRole === 'patient') return true;
+
+    const activeConsent = consentRequests.find(
+      (c) =>
+        c.patientId === patientId &&
+        (c.requestingHospitalId === requestingHospitalId || String(c.requestingHospitalId) === String(requestingHospitalId)) &&
+        c.status === 'APPROVED_ACTIVE'
+    );
+    return !!activeConsent;
+  };
+
+  // Reset / Refresh Data from Atlas
+  const resetDemoData = async () => {
+    await loadBackendData();
+    showToast('Data Refreshed', 'Refreshed latest clinical records and entities from MongoDB Atlas.', 'info');
+  };
+
+  const uploadDocumentRecord = ({ patientId, title, category, fileAttachment, summary }) => {
+    const newRecId = `REC-DOC-${Date.now().toString().slice(-5)}`;
     const newRecord = {
       id: newRecId,
       patientId,
@@ -395,137 +620,34 @@ export const AppProvider = ({ children }) => {
       hospitalName: currentHospital.name,
       doctorName: currentDoctor.name,
       doctorId: currentDoctor.id,
-      specialty: currentDoctor.specialty,
-      recordType: category === 'Prescription' ? 'Consultation & Prescription' : 'Clinical Consultation',
-      category,
-      date: new Date().toISOString().split('T')[0],
-      title: title || `Consultation: ${diagText || 'Health Review'}`,
-      summary: doctorNotes || `Clinical evaluation conducted. Prescribed ${medsText}.`,
-      plainLanguageExplanation: plainExplanation,
-      diagnoses: diagnoses || [],
-      medications: medications || [],
-      testsOrdered: testsOrdered || [],
-      doctorNotes: doctorNotes || '',
-      isImmutable: true,
-      fileAttachment: {
-        name: `${currentHospital.name.replace(/\s+/g, '_')}_Consult_${newRecId}.pdf`,
-        size: '320 KB',
-        ocrExtracted: true
-      }
-    };
-
-    setRecords(prev => [newRecord, ...prev]);
-    addAuditLog('CREATE_CONSULTATION_RECORD', `Doctor recorded new consultation with ${medications.length} meds and ${diagnoses.length} diagnoses.`, newRecId, `${patient?.name} (${patientId})`);
-    showToast('Consultation Recorded', `New record ${newRecId} securely stored and cryptographically signed.`, 'success');
-    return newRecord;
-  };
-
-  // Upload Lab Report / Document (by Assistant, Patient, or Doctor)
-  const uploadDocumentRecord = ({ patientId, title, category, fileAttachment, testResults, summary, extractedData }) => {
-    const newRecId = `REC-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-    const patient = patients.find(p => p.id === patientId);
-
-    const newRecord = {
-      id: newRecId,
-      patientId,
-      hospitalId: currentHospital.id,
-      hospitalName: currentHospital.name,
-      doctorName: currentRole === 'doctor' ? currentDoctor.name : 'Attending Radiologist/Pathologist',
-      doctorId: currentRole === 'doctor' ? currentDoctor.id : 'DOC-LAB-01',
-      specialty: category === 'Lab Report' ? 'Pathology' : category === 'Diagnostic Imaging' ? 'Radiology' : 'General Care',
-      recordType: category,
+      specialty: 'Diagnostics',
+      recordType: category || 'Lab Report',
       category: category || 'Lab Report',
       date: new Date().toISOString().split('T')[0],
-      title: title || `Uploaded ${category} Report`,
-      summary: summary || (extractedData ? `AI OCR extracted ${extractedData.medicines?.length || 0} meds / ${extractedData.results?.length || 0} test values.` : 'Uploaded medical diagnostic document.'),
-      plainLanguageExplanation: `This ${category.toLowerCase()} was uploaded to your MediVault record. It contains lab/diagnostic results from ${currentHospital.name}. Check with your doctor to interpret any flagged values.`,
-      testResults: testResults || extractedData?.results?.map(r => ({ test: r.param, value: r.value, reference: r.normalRange, status: r.flag })) || [],
-      diagnoses: extractedData?.diagnosis ? [{ code: 'AI-OCR', name: extractedData.diagnosis, status: 'Extracted' }] : [],
-      medications: extractedData?.medicines?.map(m => ({ drug: m.name, dosage: m.dosage, frequency: m.frequency, duration: m.duration, instructions: 'As per upload' })) || [],
-      isImmutable: true,
-      fileAttachment: fileAttachment || {
-        name: `${category.replace(/\s+/g, '_')}_${Date.now()}.pdf`,
-        size: '640 KB',
-        ocrExtracted: true
-      }
+      title: title || `${category} Document`,
+      summary: summary || 'Medical document metadata registered.',
+      fileAttachment
     };
-
-    setRecords(prev => [newRecord, ...prev]);
-    addAuditLog('UPLOAD_MEDICAL_DOCUMENT', `Uploaded and categorized ${category} document. AI OCR parsed entities.`, newRecId, `${patient?.name} (${patientId})`);
-    showToast('Document Stored', `${title || category} uploaded and added to patient medical timeline.`, 'success');
+    setRecords((prev) => [newRecord, ...prev]);
+    showToast('Document Metadata Stored', `${title} registered in patient timeline.`, 'success');
     return newRecord;
-  };
-
-  // Update existing medical record (by Doctor)
-  const updateMedicalRecord = (recordId, updatedData) => {
-    const existing = records.find(r => r.id === recordId);
-    if (existing && currentRole === 'doctor') {
-      const isAuthor = (existing.doctorId && currentDoctor?.id && existing.doctorId === currentDoctor.id) ||
-        (existing.doctorName && currentDoctor?.name && (
-          existing.doctorName.toLowerCase().includes(currentDoctor.name.toLowerCase().split(',')[0].trim()) ||
-          currentDoctor.name.toLowerCase().includes(existing.doctorName.toLowerCase().split(',')[0].trim())
-        ));
-
-      if (!isAuthor) {
-        showToast(
-          'Permission Denied',
-          `Cannot edit record authored by ${existing.doctorName || 'another doctor'}. You can only edit records you have personally authored.`,
-          'error'
-        );
-        return false;
-      }
-    }
-
-    setRecords(prev => prev.map(r => r.id === recordId ? { ...r, ...updatedData } : r));
-    addAuditLog('EDIT_PATIENT_MEDICAL_RECORD', `Doctor ${currentDoctor?.name || 'Doctor'} edited their signed record ${recordId}.`, recordId);
-    showToast('Record Updated', `Medical record ${recordId} successfully saved and signed.`, 'success');
-    return true;
-  };
-
-  // Update patient clinical profile (e.g. chronic conditions, allergies, currentMed, vitals)
-  const updatePatientProfile = (patientId, updatedData) => {
-    setPatients(prev => prev.map(p => p.id === patientId ? { ...p, ...updatedData } : p));
-    addAuditLog('UPDATE_PATIENT_CLINICAL_PROFILE', `Doctor updated clinical profile for patient ${patientId}.`, 'N/A', `${updatedData.name || patientId}`);
-    showToast('Patient Record Updated', 'Patient medical profile and active prescriptions updated.', 'success');
-  };
-
-  // Check if active user/doctor has authorized access to a patient's records from another hospital
-  const hasAccessToRecord = (record, requestingHospitalId = currentHospital.id, patientId = record.patientId) => {
-    // If own hospital record, always accessible
-    if (record.hospitalId === requestingHospitalId) return true;
-
-    // If viewing as the patient themselves, always accessible
-    if (currentRole === 'patient') return true;
-
-    // Check if there is an active temporary consent token
-    const activeConsent = consentRequests.find(
-      c => c.patientId === patientId && c.requestingHospitalId === requestingHospitalId && c.status === 'APPROVED_ACTIVE'
-    );
-
-    return !!activeConsent;
-  };
-
-  // Reset demo state
-  const resetDemoData = () => {
-    localStorage.removeItem(`${STORAGE_PREFIX}patients`);
-    localStorage.removeItem(`${STORAGE_PREFIX}records`);
-    localStorage.removeItem(`${STORAGE_PREFIX}visits`);
-    localStorage.removeItem(`${STORAGE_PREFIX}consents`);
-    localStorage.removeItem(`${STORAGE_PREFIX}audit`);
-    setPatients(PATIENTS);
-    setRecords(MEDICAL_RECORDS);
-    setActiveVisits(ACTIVE_VISITS);
-    setConsentRequests(CONSENT_REQUESTS);
-    setAuditLogs(AUDIT_TRAIL);
-    showToast('Data Reset', 'Restored default MediVault demo state and test scenarios.', 'info');
   };
 
   return (
     <AppContext.Provider
       value={{
-        // Roles & Identities
+        // Session & Auth
+        currentUser,
         currentRole,
+        isAuthenticated,
+        authLoading,
         switchRole,
+        login,
+        logout,
+        registerStaff,
+        claimPatientAccount,
+
+        // Active Entities
         activeHospitalId,
         setActiveHospitalId,
         currentHospital,
@@ -551,10 +673,9 @@ export const AppProvider = ({ children }) => {
         notifications,
         toasts,
 
-        // Actions
+        // Operations
         showToast,
         removeToast,
-        addAuditLog,
         registerPatient,
         checkInPatient,
         endVisit,

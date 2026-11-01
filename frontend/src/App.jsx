@@ -96,7 +96,7 @@ const MainLayout = () => {
     const handleAuthSuccess = (role) => {
         if (role === "doctor") {
             handleNavigateToDoctor();
-        } else if (role === "receptionist") {
+        } else if (role === "receptionist" || role === "assistant") {
             setCurrentView("receptionist");
         } else {
             setCurrentView("patient");

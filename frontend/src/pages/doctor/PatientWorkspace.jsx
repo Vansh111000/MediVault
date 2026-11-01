@@ -3,7 +3,8 @@ import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import Icon from "../../components/Icon";
 import StatusBadge from "../../components/doctor/StatusBadge";
 import { toDisplayStatus, toDisplayVisitType } from "../../components/doctor/patientDisplay";
-import { patients, createMedicine, getAllergyLabel, getBodyMeasurements } from "../../data/mockData";
+import { patients as mockPatients, createMedicine, getAllergyLabel, getBodyMeasurements } from "../../data/mockData";
+import { useApp } from "../../context/AppContext";
 import VisitSummary from "./patient-workspace/VisitSummary";
 
 const tabs = [
@@ -29,8 +30,8 @@ function initials(name) {
 
 function getRecordAvailability(patient) {
     if (patient.status === "completed") return "Visit summary available";
-    if (patient.consent.type === "none") return "No previous records";
-    return patient.consent.label;
+    if (!patient.consent || patient.consent.type === "none") return "No previous records";
+    return patient.consent.label || "Records available";
 }
 
 function InfoRow({ icon, label, value }) {
@@ -49,6 +50,7 @@ function InfoRow({ icon, label, value }) {
 
 function WorkspaceBody({ patient }) {
     const [consultForm, setConsultForm] = useState({
+        clinicalNote: "",
         chiefComplaint: "",
         symptoms: "",
         examination: "",
@@ -60,14 +62,16 @@ function WorkspaceBody({ patient }) {
     const [consultStatus, setConsultStatus] = useState("not-started"); // not-started | draft | completed
     const [completedRecord, setCompletedRecord] = useState(null);
 
-    const allergyLabel = getAllergyLabel(patient);
-    const { height, weight } = getBodyMeasurements(patient);
+    const allergyLabel = getAllergyLabel ? getAllergyLabel(patient) : null;
+    const measurements = getBodyMeasurements ? getBodyMeasurements(patient) : { height: patient.vitals?.height || '--', weight: patient.vitals?.weight || '--' };
+    const { height, weight } = measurements;
+
     const profileDetails = [
-        { label: "Age", value: `${patient.age} yrs` },
-        { label: "Sex", value: patient.gender },
+        { label: "Age", value: `${patient.age || '--'} yrs` },
+        { label: "Sex", value: patient.gender || '--' },
         { label: "Height", value: height },
         { label: "Weight", value: weight },
-        { label: "Blood Group", value: patient.bloodGroup },
+        { label: "Blood Group", value: patient.bloodGroup || '--' },
     ];
 
     const context = {
@@ -108,7 +112,7 @@ function WorkspaceBody({ patient }) {
                                     {patient.name}
                                 </h1>
                                 <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200/60">
-                                    {patient.id}
+                                    {patient.mediVaultId || patient.id}
                                 </span>
                             </div>
                             <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-1.5 text-xs">
@@ -137,7 +141,7 @@ function WorkspaceBody({ patient }) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
                     <InfoRow icon="assignment" label="Visit type" value={toDisplayVisitType(patient.visitType)} />
-                    <InfoRow icon="schedule" label="Appointment time" value={patient.time} />
+                    <InfoRow icon="schedule" label="Appointment time" value={patient.time || '--'} />
                     <InfoRow icon="folder_shared" label="Records" value={getRecordAvailability(patient)} />
                 </div>
             </div>
@@ -170,7 +174,35 @@ function WorkspaceBody({ patient }) {
 
 export default function PatientWorkspace() {
     const { patientId } = useParams();
-    const patient = patients.find((p) => p.id === patientId);
+    const { patients: contextPatients, activeVisits } = useApp();
+
+    // First try mockData (for doctors working with the built-in patient queue)
+    let patient = mockPatients.find((p) => p.id === patientId);
+
+    // If not found in mock data, look in AppContext patients (real backend data)
+    if (!patient) {
+        const contextPatient = contextPatients.find(
+            (p) => p._id === patientId || p.id === patientId || p.mediVaultId === patientId
+        );
+        if (contextPatient) {
+            // Find the associated active visit to get status and token
+            const visit = activeVisits.find(
+                (v) => v.patientId === patientId || v.patientId === contextPatient._id || v.patientId === contextPatient.id
+            );
+            patient = {
+                ...contextPatient,
+                id: contextPatient._id || contextPatient.id,
+                status: visit?.status === 'In Doctor Queue' ? 'waiting'
+                      : visit?.status === 'Completed' ? 'completed'
+                      : 'checked-in',
+                time: visit?.checkInTime
+                    ? new Date(visit.checkInTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                    : '--',
+                visitType: 'new',
+                consent: { type: 'full', label: 'Full access granted' },
+            };
+        }
+    }
 
     if (!patient) {
         return (

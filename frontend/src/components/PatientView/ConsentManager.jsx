@@ -12,7 +12,9 @@ export const ConsentManager = ({ patient, onOpenQrModal }) => {
     return () => clearInterval(timer);
   }, []);
 
-  const patientConsents = consentRequests.filter(c => c.patientId === patient?.id);
+  const patientConsents = consentRequests.filter(
+    c => !c.patientId || c.patientId === patient?.id || c.patientId === patient?._id || c.patientId === patient?.mediVaultId
+  );
   const activeConsents = patientConsents.filter(c => c.status === 'APPROVED_ACTIVE');
   const pendingRequests = patientConsents.filter(c => c.status === 'PENDING');
   const pastConsents = patientConsents.filter(c => c.status === 'EXPIRED' || c.status === 'REVOKED' || c.status === 'REJECTED');

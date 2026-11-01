@@ -29,21 +29,32 @@ export const PatientDashboard = ({ onLogout }) => {
   const [selectedRecordDetail, setSelectedRecordDetail] = useState(null);
 
   // Filter records for this patient
-  const patientRecords = records.filter(r => r.patientId === currentPatient.id);
+  const patientRecords = records.filter(
+    (r) =>
+      !r.patientId ||
+      r.patientId === currentPatient?.id ||
+      r.patientId === currentPatient?._id ||
+      r.patientId === currentPatient?.mediVaultId
+  );
 
   // Extract all medications
   const allMedications = patientRecords
-    .filter(r => r.medications && r.medications.length > 0)
-    .flatMap(r => r.medications.map(m => ({
-      ...m,
-      doctorName: r.doctorName,
-      hospitalName: r.hospitalName,
-      date: r.date
-    })));
+    .filter((r) => r.medications && r.medications.length > 0)
+    .flatMap((r) =>
+      r.medications.map((m) => ({
+        ...m,
+        drug: m.drug || m.name,
+        doctorName: r.doctorName,
+        hospitalName: r.hospitalName,
+        date: r.date,
+      }))
+    );
 
   // Deduplicate medications
-  const uniqueMedications = allMedications.filter((med, idx, self) =>
-    idx === self.findIndex(m => m.drug.toLowerCase() === med.drug.toLowerCase())
+  const uniqueMedications = allMedications.filter(
+    (med, idx, self) =>
+      med.drug &&
+      idx === self.findIndex((m) => m.drug && m.drug.toLowerCase() === med.drug.toLowerCase())
   );
 
   const [consents, setConsents] = useState([
