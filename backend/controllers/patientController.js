@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { Patient, Visit, Consultation, Consent, HospitalPatient, Hospital } = require('../models');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { generateMediVaultId, generateActivationCode, hashActivationCode } = require('../utils/generateId');
@@ -203,8 +204,10 @@ const getPatient = async (req, res, next) => {
     let patient;
     if (idOrMv.toUpperCase().startsWith('MV-')) {
       patient = await Patient.findOne({ mediVaultId: idOrMv.toUpperCase() });
-    } else {
+    } else if (mongoose.Types.ObjectId.isValid(idOrMv)) {
       patient = await Patient.findById(idOrMv);
+    } else {
+      return errorResponse(res, 404, 'Patient not found.');
     }
 
     if (!patient) {

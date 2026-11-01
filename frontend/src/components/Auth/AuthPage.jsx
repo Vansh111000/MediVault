@@ -287,7 +287,7 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
                 <input
                   type="text"
                   required
-                  placeholder={selectedRole === 'doctor' ? 'Dr. Sarah Sharma' : 'Staff Member Name'}
+                  placeholder={selectedRole === 'doctor' ? 'Doctor Name' : 'Staff Member Name'}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600 transition-colors"
@@ -311,8 +311,8 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
                     placeholder={
                       selectedRole === 'doctor'
                         ? 'doctor@medivault.com'
-                        : selectedRole === 'receptionist'
-                        ? 'reception@medivault.com'
+                        : selectedRole === 'assistant'
+                        ? 'assistant@medivault.com'
                         : 'patient@medivault.com or MV-10001'
                     }
                     value={email}

@@ -112,7 +112,7 @@ export const NewPatientRegistrationModal = ({ isOpen, onClose, onRegistered }) =
                 required
                 value={formData.phone}
                 onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+1 (555) 000-0000"
+                placeholder="+91 9220000000"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-indigo-500 focus:outline-none"
               />
             </div>
@@ -229,7 +229,7 @@ export const NewPatientRegistrationModal = ({ isOpen, onClose, onRegistered }) =
                 type="text"
                 value={formData.emergencyPhone}
                 onChange={e => setFormData({ ...formData, emergencyPhone: e.target.value })}
-                placeholder="+1 (555) 999-8877"
+                placeholder="+91 9999998877"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none"
               />
             </div>

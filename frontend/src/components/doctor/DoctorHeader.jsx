@@ -1,14 +1,28 @@
 import { Shield, ArrowLeft, LogOut } from "lucide-react";
-import { doctor } from "../../data/mockData";
 
-export default function DoctorHeader({ onNavigateHome }) {
-    const initials = doctor.shortName
-        ? doctor.shortName
-              .replace("Dr. ", "")
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-        : "DR";
+/**
+ * DoctorHeader – shows the authenticated doctor's real identity.
+ * Receives doctorName, specialty, hospitalName as props from DoctorLayout.
+ * Never imports from mockData.
+ */
+export default function DoctorHeader({ onNavigateHome, doctorName, specialty, hospitalName }) {
+    let displayName = doctorName || "Doctor";
+    if (displayName !== "Doctor") {
+        displayName = displayName
+            .replace(/,?\s*\b(M\.?D\.?|M\.?B\.?B\.?S\.?|M\.?S\.?|M\.?Ch\.?|DNB|DM|Ph\.?D\.?|FRCS|FRCP|DO|BDS|MDS)\b/gi, "")
+            .replace(/,\s*$/, "")
+            .replace(/\s+/g, " ")
+            .trim();
+        if (!displayName.startsWith("Dr.") && !displayName.startsWith("Dr ")) {
+            displayName = `Dr. ${displayName}`;
+        }
+    }
+    const initials = displayName
+        .replace(/^Dr\.?\s*/i, "")
+        .split(" ")
+        .map((n) => (n[0] || "")).slice(0, 2)
+        .join("")
+        .toUpperCase() || "DR";
 
     return (
         <nav className="bg-[#f8fafc] sticky top-0 z-40">
@@ -41,9 +55,9 @@ export default function DoctorHeader({ onNavigateHome }) {
                             {initials}
                         </div>
                         <div className="hidden sm:block text-left text-xs">
-                            <div className="font-bold text-slate-900">{doctor.name}</div>
+                            <div className="font-bold text-slate-900">{displayName}</div>
                             <div className="text-[11px] text-slate-700 font-medium">
-                                {doctor.specialty} • {doctor.hospital}
+                                {specialty ? `${specialty}${hospitalName ? ` • ${hospitalName}` : ""}` : (hospitalName || "MediVault Portal")}
                             </div>
                         </div>
                     </div>

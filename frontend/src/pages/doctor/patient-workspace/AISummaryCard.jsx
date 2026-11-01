@@ -1,27 +1,27 @@
 import { useState, useEffect } from "react";
 import Icon from "../../../components/Icon";
-import { patientsRecords, formatDate } from "../../../data/mockData";
 import api from "../../../services/api";
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// Builds the clinical summary from authorized backend medical records or local patient data
-function buildSummary(patient, allergyLabel, liveHistory) {
-    const mockRecs = patientsRecords[patient?.id] || patientsRecords[patient?._id];
+function formatDate(isoStr) {
+    if (!isoStr) return "";
+    const d = new Date(isoStr);
+    return isNaN(d.getTime()) ? isoStr : d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
 
-    // Priority to authorized live backend consultations
+// Builds the clinical summary solely from authorized backend medical records
+function buildSummary(patient, allergyLabel, liveHistory) {
     const rawConsultations = liveHistory?.consultations || [];
-    const consultations = rawConsultations.length > 0
-        ? rawConsultations.map(c => ({
-            id: c._id || c.id,
-            diagnosis: c.diagnosis || (c.clinicalNote ? c.clinicalNote.slice(0, 45) + '...' : 'Clinical Consultation'),
-            date: c.createdAt ? c.createdAt.split('T')[0] : '2026-08-12',
-            hospital: c.hospital?.name || 'MediVault Medical Center',
-            visitType: 'Outpatient Encounter',
-            reason: c.reason || c.clinicalNote?.slice(0, 30) || 'General Consultation',
-            treatment: c.clinicalNote || 'Advised treatment'
-        }))
-        : (mockRecs?.consultations ?? []);
+    const consultations = rawConsultations.map(c => ({
+        id: c._id || c.id,
+        diagnosis: c.diagnosis || (c.clinicalNote ? c.clinicalNote.slice(0, 45) + '...' : 'Clinical Consultation'),
+        date: c.createdAt ? c.createdAt.split('T')[0] : '',
+        hospital: c.hospital?.name || 'MediVault Medical Center',
+        visitType: 'Outpatient Encounter',
+        reason: c.reason || c.clinicalNote?.slice(0, 30) || 'General Consultation',
+        treatment: c.clinicalNote || 'Advised treatment'
+    }));
 
     const rawPrescriptions = rawConsultations.flatMap(c => (c.prescriptions || []).map(p => ({
         id: `${c._id}-${p.name}`,
@@ -29,9 +29,9 @@ function buildSummary(patient, allergyLabel, liveHistory) {
         medications: [{ name: p.name, dosage: p.dosage || 'Standard', frequency: p.frequency || 'Once daily', duration: p.duration || '7 days' }]
     })));
 
-    const prescriptions = rawPrescriptions.length > 0 ? rawPrescriptions : (mockRecs?.prescriptions ?? []);
-    const bloodReports = mockRecs?.bloodReports ?? [];
-    const otherReports = mockRecs?.otherReports ?? [];
+    const prescriptions = rawPrescriptions;
+    const bloodReports = liveHistory?.bloodReports || [];
+    const otherReports = liveHistory?.otherReports || [];
 
     const hasRecords =
         consultations.length +
@@ -242,7 +242,7 @@ const emptyLine = (text) => (
 );
 
 export default function AISummaryCard({ patient, allergyLabel, records }) {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(false);
     const [liveHistory, setLiveHistory] = useState(records || null);
     const [loading, setLoading] = useState(false);
 

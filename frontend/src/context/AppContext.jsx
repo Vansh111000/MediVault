@@ -24,22 +24,24 @@ export const AppProvider = ({ children }) => {
   const [authLoading, setAuthLoading] = useState(true);
 
   // Active Entities
-  const [activeHospitalId, setActiveHospitalIdState] = useState(DEFAULT_SESSION.hospitalId);
-  const [activePatientId, setActivePatientId] = useState(DEFAULT_SESSION.patientId);
-  const [activeDoctorId, setActiveDoctorId] = useState(DEFAULT_SESSION.doctorId);
-  const [activeAssistantId, setActiveAssistantId] = useState(DEFAULT_SESSION.assistantId);
+  const [activeHospitalId, setActiveHospitalIdState] = useState(null);
+  const [activePatientId, setActivePatientId] = useState(null);
+  const [activeDoctorId, setActiveDoctorId] = useState(null);
+  const [activeAssistantId, setActiveAssistantId] = useState(null);
+  const [authenticatedDoctorProfile, setAuthenticatedDoctorProfile] = useState(null);
+  const [authenticatedHospital, setAuthenticatedHospital] = useState(null);
 
   // Data Stores (backed by MongoDB Atlas via API)
-  const [hospitals, setHospitals] = useState(DEFAULT_HOSPITALS);
-  const [doctors, setDoctors] = useState(DEFAULT_DOCTORS);
-  const [assistants, setAssistants] = useState(DEFAULT_ASSISTANTS);
-  const [patients, setPatients] = useState(DEFAULT_PATIENTS);
-  const [records, setRecords] = useState(DEFAULT_RECORDS);
-  const [activeVisits, setActiveVisits] = useState(DEFAULT_VISITS);
-  const [consentRequests, setConsentRequests] = useState(DEFAULT_CONSENTS);
-  const [auditLogs, setAuditLogs] = useState(DEFAULT_AUDIT);
+  const [hospitals, setHospitals] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [assistants, setAssistants] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [records, setRecords] = useState([]);
+  const [activeVisits, setActiveVisits] = useState([]);
+  const [consentRequests, setConsentRequests] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [toasts, setToasts] = useState([]);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
 
   const setActiveHospitalId = (id) => {
     setActiveHospitalIdState(id);
@@ -120,7 +122,7 @@ export const AppProvider = ({ children }) => {
         }
       }
 
-      // 2. Fetch doctors
+      // 2. Fetch doctors scoped to authenticated hospital (backend enforces scoping)
       const docRes = await api.getDoctors().catch(() => null);
       if (docRes?.data && docRes.data.length > 0) {
         const mappedDoctors = docRes.data.map(d => ({
@@ -128,14 +130,13 @@ export const AppProvider = ({ children }) => {
           _id: d._id,
           name: d.name,
           specialty: d.specialty,
-          hospitalId: d.hospital || activeHospitalId,
-          hospitalName: 'Affiliated Hospital',
           licenseNumber: d.licenseNumber,
           email: d.email || d.user?.email,
-          experience: '12+ Years',
-          rating: 4.9
         }));
         setDoctors(mappedDoctors);
+      } else if (docRes) {
+        // Clear stale mock doctors when backend returns empty
+        setDoctors([]);
       }
 
       // 3. Fetch patients: prioritize hospital-specific directory for staff
@@ -252,11 +253,25 @@ export const AppProvider = ({ children }) => {
           if (res?.data?.user) {
             const u = res.data.user;
             setCurrentUser(u);
-            setCurrentRole(u.role === 'receptionist' ? 'assistant' : u.role);
+            const mappedRole = u.role === 'receptionist' ? 'assistant' : u.role;
+            setCurrentRole(mappedRole);
             setIsAuthenticated(true);
 
             if (res.data.activeHospital) {
               setActiveHospitalId(res.data.activeHospital._id || res.data.activeHospital);
+              setAuthenticatedHospital(res.data.activeHospital);
+            }
+
+            if (mappedRole === 'doctor') {
+              try {
+                const docDash = await api.getDoctorDashboard();
+                if (docDash?.data?.doctor) {
+                  setAuthenticatedDoctorProfile(docDash.data.doctor);
+                  if (docDash.data.activeHospital) {
+                    setAuthenticatedHospital(docDash.data.activeHospital);
+                  }
+                }
+              } catch (_) {}
             }
           }
         } catch (e) {
@@ -271,11 +286,11 @@ export const AppProvider = ({ children }) => {
     initAuth();
   }, [loadBackendData]);
 
-  // Derived active entity objects
-  const currentHospital = hospitals.find((h) => h.id === activeHospitalId || h._id === activeHospitalId) || hospitals[0] || DEFAULT_HOSPITALS[0];
-  const currentPatient = patients.find((p) => p.id === activePatientId || p._id === activePatientId || p.mediVaultId === activePatientId) || patients[0] || DEFAULT_PATIENTS[0];
-  const currentDoctor = doctors.find((d) => d.id === activeDoctorId || d._id === activeDoctorId) || doctors[0] || DEFAULT_DOCTORS[0];
-  const currentAssistant = assistants.find((a) => a.id === activeAssistantId || a._id === activeAssistantId) || assistants[0] || DEFAULT_ASSISTANTS[0];
+  // Derived active entity objects (strictly from live backend, no mock fallbacks)
+  const currentHospital = authenticatedHospital || hospitals.find((h) => h.id === activeHospitalId || h._id === activeHospitalId) || hospitals[0] || null;
+  const currentPatient = patients.find((p) => p.id === activePatientId || p._id === activePatientId || p.mediVaultId === activePatientId) || patients[0] || null;
+  const currentDoctor = authenticatedDoctorProfile || doctors.find((d) => d.id === activeDoctorId || d._id === activeDoctorId) || doctors[0] || null;
+  const currentAssistant = assistants.find((a) => a.id === activeAssistantId || a._id === activeAssistantId) || assistants[0] || null;
 
   // Switch role and update session
   const switchRole = (role) => {
@@ -302,6 +317,7 @@ export const AppProvider = ({ children }) => {
         if (res.data.memberships?.[0]?.hospital) {
           const hospId = res.data.memberships[0].hospital._id || res.data.memberships[0].hospital;
           setActiveHospitalId(hospId);
+          setAuthenticatedHospital(res.data.memberships[0].hospital);
         }
 
         if (u.patientProfile) {
@@ -309,6 +325,18 @@ export const AppProvider = ({ children }) => {
         }
         if (u.doctorProfile) {
           setActiveDoctorId(u.doctorProfile._id || u.doctorProfile);
+        }
+
+        if (mappedRole === 'doctor') {
+          try {
+            const docDash = await api.getDoctorDashboard();
+            if (docDash?.data?.doctor) {
+              setAuthenticatedDoctorProfile(docDash.data.doctor);
+              if (docDash.data.activeHospital) {
+                setAuthenticatedHospital(docDash.data.activeHospital);
+              }
+            }
+          } catch (_) {}
         }
 
         await loadBackendData();
@@ -327,6 +355,8 @@ export const AppProvider = ({ children }) => {
     setCurrentUser(null);
     setIsAuthenticated(false);
     setCurrentRole('patient');
+    setAuthenticatedDoctorProfile(null);
+    setAuthenticatedHospital(null);
     showToast('Signed Out', 'You have been logged out of MediVault.', 'info');
   };
 
@@ -432,14 +462,15 @@ export const AppProvider = ({ children }) => {
   // Check-In Patient & Assign Doctor (calls backend /api/visits)
   const checkInPatient = async ({ patientId, doctorId, assignedDoctorIds, priority = 'Routine', reason = 'General Consultation', triageVitals = {} }) => {
     try {
+      // Build doctor list from what was explicitly passed – no mock fallback
       const docList = assignedDoctorIds && assignedDoctorIds.length > 0
         ? assignedDoctorIds
-        : (doctorId ? [doctorId] : [currentDoctor.id || currentDoctor._id]);
+        : (doctorId ? [doctorId] : []);
 
       const payload = {
         patientId,
-        hospitalId: currentHospital.id || currentHospital._id,
-        doctorId: docList[0],
+        // hospitalId intentionally omitted here – backend derives it from authenticated membership
+        ...(docList[0] && { doctorId: docList[0] }),
         assignedDoctorIds: docList,
         reasonForVisit: reason,
         priority,

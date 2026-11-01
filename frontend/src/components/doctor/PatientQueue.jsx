@@ -17,23 +17,18 @@ const visitTypeTones = {
 };
 
 const FILTERS = ["waiting", "upcoming", "completed"];
-
-const FILTER_LABELS = {
-    waiting: "Waiting",
-    upcoming: "Upcoming",
-    completed: "Completed",
-};
+const FILTER_LABELS = { waiting: "Waiting", upcoming: "Upcoming", completed: "Completed" };
 
 function initials(name) {
-    return name
+    return (name || "?")
         .split(" ")
-        .map((part) => part[0])
+        .map((part) => part[0] || "")
         .slice(0, 2)
         .join("")
         .toUpperCase();
 }
 
-export default function PatientQueue({ patients }) {
+export default function PatientQueue({ patients, onRefresh }) {
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
 
@@ -47,12 +42,11 @@ export default function PatientQueue({ patients }) {
         const matchesFilter = filter === "all" || toDisplayStatus(p.status) === filter;
         const matchesQuery =
             !normalizedQuery ||
-            p.name.toLowerCase().includes(normalizedQuery) ||
-            p.id.toLowerCase().includes(normalizedQuery);
+            (p.name || "").toLowerCase().includes(normalizedQuery) ||
+            (p.mediVaultId || "").toLowerCase().includes(normalizedQuery) ||
+            (p.tokenNumber || "").toLowerCase().includes(normalizedQuery);
         return matchesFilter && matchesQuery;
     });
-
-    const visible = matches;
 
     return (
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 space-y-4">
@@ -60,9 +54,19 @@ export default function PatientQueue({ patients }) {
                 <div>
                     <h2 className="text-lg font-bold text-slate-900">Today's Patients</h2>
                     <p className="text-xs text-slate-500 font-medium">
-                        Search and open the patients assigned to you.
+                        Patients assigned to you from the hospital queue.
                     </p>
                 </div>
+                {onRefresh && (
+                    <button
+                        type="button"
+                        onClick={onRefresh}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl border border-slate-200 transition-all"
+                    >
+                        <Icon className="text-[16px]">refresh</Icon>
+                        Refresh
+                    </button>
+                )}
             </div>
 
             {/* Search & filters */}
@@ -73,7 +77,7 @@ export default function PatientQueue({ patients }) {
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search by patient name or ID..."
+                        placeholder="Search by name, MediVault ID or token..."
                         className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:border-teal-700 font-medium transition-all"
                     />
                 </div>
@@ -102,7 +106,7 @@ export default function PatientQueue({ patients }) {
                     <thead>
                         <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200/80">
                             <th className="py-3 px-4">Patient</th>
-                            <th className="py-3 px-3">Patient ID</th>
+                            <th className="py-3 px-3">MediVault ID</th>
                             <th className="py-3 px-3">Appointment</th>
                             <th className="py-3 px-3">Visit Type</th>
                             <th className="py-3 px-3">Status</th>
@@ -110,27 +114,27 @@ export default function PatientQueue({ patients }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {visible.length === 0 && (
+                        {matches.length === 0 && (
                             <tr>
                                 <td colSpan={6} className="py-10 text-center text-slate-400 font-medium">
-                                    No patients match your search.
+                                    {patients.length === 0
+                                        ? "No patients assigned to you today."
+                                        : "No patients match your search."}
                                 </td>
                             </tr>
                         )}
 
-                        {visible.map((patient, index) => {
+                        {matches.map((patient, index) => {
                             const done = patient.status === "completed";
                             const avatar = done
                                 ? "bg-slate-100 text-slate-500 border border-slate-200"
                                 : avatarTones[index % avatarTones.length];
 
                             return (
-                                <tr key={patient.id} className="hover:bg-slate-50/70 transition-colors">
+                                <tr key={patient._id || patient.id || index} className="hover:bg-slate-50/70 transition-colors">
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-3">
-                                            <div
-                                                className={`w-9 h-9 rounded-full font-bold flex items-center justify-center text-xs shrink-0 ${avatar}`}
-                                            >
+                                            <div className={`w-9 h-9 rounded-full font-bold flex items-center justify-center text-xs shrink-0 ${avatar}`}>
                                                 {initials(patient.name)}
                                             </div>
                                             <div>
@@ -152,30 +156,21 @@ export default function PatientQueue({ patients }) {
                                         </div>
                                     </td>
 
-                                    <td
-                                        className={`py-3 px-3 font-semibold text-xs ${
-                                            done ? "text-slate-400" : "text-slate-900 font-mono"
-                                        }`}
-                                    >
-                                        {patient.id}
+                                    <td className={`py-3 px-3 font-semibold text-xs ${done ? "text-slate-400" : "text-slate-900 font-mono"}`}>
+                                        {patient.mediVaultId || <span className="text-slate-300 italic">—</span>}
                                     </td>
 
                                     <td className="py-3 px-3">
-                                        <span
-                                            className={`font-semibold block ${
-                                                done ? "text-slate-400" : "text-slate-900"
-                                            }`}
-                                        >
+                                        <span className={`font-semibold block ${done ? "text-slate-400" : "text-slate-900"}`}>
                                             {patient.time}
                                         </span>
+                                        {patient.tokenNumber && (
+                                            <span className="text-[10px] text-slate-400 font-medium">{patient.tokenNumber}</span>
+                                        )}
                                     </td>
 
                                     <td className="py-3 px-3">
-                                        <span
-                                            className={`px-2 py-0.5 rounded-md text-[11px] ${
-                                                visitTypeTones[toDisplayVisitType(patient.visitType)]
-                                            }`}
-                                        >
+                                        <span className={`px-2 py-0.5 rounded-md text-[11px] ${visitTypeTones[toDisplayVisitType(patient.visitType)] || "bg-slate-100 text-slate-600"}`}>
                                             {toDisplayVisitType(patient.visitType)}
                                         </span>
                                     </td>
@@ -185,19 +180,19 @@ export default function PatientQueue({ patients }) {
                                     </td>
 
                                     <td className="py-3 px-4 text-right">
-                                        {toDisplayStatus(patient.status) !== "upcoming" && (
-                                        <Link
-                                            to={`/doctor/patients/${patient.id}`}
-                                            className={`inline-block whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                                                toDisplayStatus(patient.status) === "waiting"
-                                                    ? "bg-teal-700 hover:bg-teal-800 text-white shadow-xs"
-                                                    : done
-                                                      ? "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-xs"
-                                                      : "bg-white hover:bg-slate-50 text-teal-700 border border-teal-200 shadow-xs"
-                                            }`}
-                                        >
-                                            {toDisplayStatus(patient.status) === "waiting" ? "Open Vault" : done ? "Summary" : "View"}
-                                        </Link>
+                                        {toDisplayStatus(patient.status) !== "upcoming" && (patient._id || patient.id) && (
+                                            <Link
+                                                to={patient.visitId ? `/doctor/patients/${patient._id || patient.id}?visitId=${patient.visitId}` : `/doctor/patients/${patient._id || patient.id}`}
+                                                className={`inline-block whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                                                    toDisplayStatus(patient.status) === "waiting"
+                                                        ? "bg-teal-700 hover:bg-teal-800 text-white shadow-xs"
+                                                        : done
+                                                          ? "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-xs"
+                                                          : "bg-white hover:bg-slate-50 text-teal-700 border border-teal-200 shadow-xs"
+                                                }`}
+                                            >
+                                                {toDisplayStatus(patient.status) === "waiting" ? "Open Vault" : done ? "Summary" : "View"}
+                                            </Link>
                                         )}
                                     </td>
                                 </tr>
@@ -208,7 +203,7 @@ export default function PatientQueue({ patients }) {
             </div>
 
             <div className="pt-1 text-xs text-slate-500">
-                Showing {visible.length} of {patients.length} patients
+                Showing {matches.length} of {patients.length} patients
             </div>
         </div>
     );
