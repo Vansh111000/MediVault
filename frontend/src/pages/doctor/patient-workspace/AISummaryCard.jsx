@@ -1,17 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "../../../components/Icon";
 import { patientsRecords, formatDate } from "../../../data/mockData";
+import api from "../../../services/api";
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// Builds the summary from the patient's existing mock records (patientsRecords in mockData.js).
-function buildSummary(patient, allergyLabel) {
-    const records = patientsRecords[patient.id];
+// Builds the clinical summary from authorized backend medical records or local patient data
+function buildSummary(patient, allergyLabel, liveHistory) {
+    const mockRecs = patientsRecords[patient?.id] || patientsRecords[patient?._id];
 
-    const consultations = records?.consultations ?? [];
-    const prescriptions = records?.prescriptions ?? [];
-    const bloodReports = records?.bloodReports ?? [];
-    const otherReports = records?.otherReports ?? [];
+    // Priority to authorized live backend consultations
+    const rawConsultations = liveHistory?.consultations || [];
+    const consultations = rawConsultations.length > 0
+        ? rawConsultations.map(c => ({
+            id: c._id || c.id,
+            diagnosis: c.diagnosis || (c.clinicalNote ? c.clinicalNote.slice(0, 45) + '...' : 'Clinical Consultation'),
+            date: c.createdAt ? c.createdAt.split('T')[0] : '2026-08-12',
+            hospital: c.hospital?.name || 'MediVault Medical Center',
+            visitType: 'Outpatient Encounter',
+            reason: c.reason || c.clinicalNote?.slice(0, 30) || 'General Consultation',
+            treatment: c.clinicalNote || 'Advised treatment'
+        }))
+        : (mockRecs?.consultations ?? []);
+
+    const rawPrescriptions = rawConsultations.flatMap(c => (c.prescriptions || []).map(p => ({
+        id: `${c._id}-${p.name}`,
+        status: 'Active',
+        medications: [{ name: p.name, dosage: p.dosage || 'Standard', frequency: p.frequency || 'Once daily', duration: p.duration || '7 days' }]
+    })));
+
+    const prescriptions = rawPrescriptions.length > 0 ? rawPrescriptions : (mockRecs?.prescriptions ?? []);
+    const bloodReports = mockRecs?.bloodReports ?? [];
+    const otherReports = mockRecs?.otherReports ?? [];
 
     const hasRecords =
         consultations.length +
@@ -22,13 +42,22 @@ function buildSummary(patient, allergyLabel) {
 
     const latest = consultations[0];
 
-    // Key conditions: distinct diagnoses
+    // Key conditions: distinct diagnoses or patient chronic conditions
     const conditions = [];
 
-    consultations.forEach((c, index) => {
-        const lower = c.diagnosis.toLowerCase();
+    if (patient?.chronicConditions && Array.isArray(patient.chronicConditions)) {
+        patient.chronicConditions.forEach(cond => {
+            const condName = typeof cond === 'string' ? cond : cond.condition || cond.name;
+            if (condName) {
+                conditions.push({ name: condName, date: 'Recorded on file' });
+            }
+        });
+    }
 
-        if (lower.startsWith("no significant")) return;
+    consultations.forEach((c, index) => {
+        const lower = (c.diagnosis || '').toLowerCase();
+
+        if (!lower || lower.startsWith("no significant")) return;
         if (lower.includes("under evaluation") && index !== 0) return;
 
         const duplicate = conditions.some((x) => {
@@ -212,9 +241,40 @@ const emptyLine = (text) => (
     </p>
 );
 
-export default function AISummaryCard({ patient, allergyLabel }) {
+export default function AISummaryCard({ patient, allergyLabel, records }) {
     const [open, setOpen] = useState(true);
-    const s = buildSummary(patient, allergyLabel);
+    const [liveHistory, setLiveHistory] = useState(records || null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (records) {
+            setLiveHistory(records);
+            return;
+        }
+
+        const patId = patient?._id || patient?.id;
+        if (!patId) return;
+
+        let isMounted = true;
+        setLoading(true);
+
+        api.getPatientMedicalHistory(patId)
+            .then((res) => {
+                if (isMounted && res?.data) {
+                    setLiveHistory(res.data);
+                }
+            })
+            .catch(() => {})
+            .finally(() => {
+                if (isMounted) setLoading(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [patient?._id, patient?.id, records]);
+
+    const s = buildSummary(patient, allergyLabel, liveHistory);
 
     return (
         <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-4 sm:p-5 space-y-3">

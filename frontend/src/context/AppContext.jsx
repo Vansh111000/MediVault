@@ -67,6 +67,7 @@ export const AppProvider = ({ children }) => {
     patientName: v.patient?.name || 'Unknown Patient',
     hospitalId: v.hospital?._id || v.hospital?.id || v.hospital,
     hospitalName: v.hospital?.name || 'CityCare General Hospital',
+    assignedDoctors: v.assignedDoctors || [],
     assignedDoctorId: v.assignedDoctors?.[0]?._id || v.assignedDoctors?.[0] || 'DOC-001',
     assignedDoctorName: v.assignedDoctors?.[0]?.name || 'Dr. Sarah Sharma, MD',
     specialty: v.assignedDoctors?.[0]?.specialty || 'Cardiology',
@@ -137,26 +138,76 @@ export const AppProvider = ({ children }) => {
         setDoctors(mappedDoctors);
       }
 
-      // 3. Fetch search/patients
-      const patRes = await api.searchPatients('').catch(() => null);
-      if (patRes?.data && patRes.data.length > 0) {
-        const mappedPatients = patRes.data.map(p => ({
-          id: p._id,
-          _id: p._id,
-          mediVaultId: p.mediVaultId,
-          name: p.name,
-          age: p.age || 30,
-          gender: p.gender,
-          bloodGroup: p.bloodGroup,
-          phone: p.phone,
-          email: p.email,
-          address: p.address,
-          allergies: p.allergies || [],
-          chronicConditions: p.chronicConditions || [],
-          vitals: p.vitals || {},
-          isClaimed: p.isClaimed
-        }));
-        setPatients(mappedPatients);
+      // 3. Fetch patients: prioritize hospital-specific directory for staff
+      if (api.token) {
+        const hospPatRes = await api.getHospitalPatients().catch(() => null);
+        if (hospPatRes?.data && Array.isArray(hospPatRes.data) && hospPatRes.data.length > 0) {
+          const mappedFromDir = hospPatRes.data
+            .filter(entry => entry.patient)
+            .map(entry => {
+              const p = entry.patient;
+              return {
+                id: p._id,
+                _id: p._id,
+                mediVaultId: p.mediVaultId,
+                name: p.name,
+                age: p.age || 30,
+                gender: p.gender,
+                bloodGroup: p.bloodGroup,
+                phone: p.phone,
+                email: p.email,
+                address: p.address,
+                allergies: p.allergies || [],
+                chronicConditions: p.chronicConditions || [],
+                vitals: p.vitals || {},
+                isClaimed: p.isClaimed,
+                dateAdded: entry.dateAdded,
+                lastVisitAt: entry.lastVisitAt,
+                directoryStatus: entry.status
+              };
+            });
+          setPatients(mappedFromDir);
+        } else {
+          const patRes = await api.searchPatients('').catch(() => null);
+          if (patRes?.data && patRes.data.length > 0) {
+            setPatients(patRes.data.map(p => ({
+              id: p._id,
+              _id: p._id,
+              mediVaultId: p.mediVaultId,
+              name: p.name,
+              age: p.age || 30,
+              gender: p.gender,
+              bloodGroup: p.bloodGroup,
+              phone: p.phone,
+              email: p.email,
+              address: p.address,
+              allergies: p.allergies || [],
+              chronicConditions: p.chronicConditions || [],
+              vitals: p.vitals || {},
+              isClaimed: p.isClaimed
+            })));
+          }
+        }
+      } else {
+        const patRes = await api.searchPatients('').catch(() => null);
+        if (patRes?.data && patRes.data.length > 0) {
+          setPatients(patRes.data.map(p => ({
+            id: p._id,
+            _id: p._id,
+            mediVaultId: p.mediVaultId,
+            name: p.name,
+            age: p.age || 30,
+            gender: p.gender,
+            bloodGroup: p.bloodGroup,
+            phone: p.phone,
+            email: p.email,
+            address: p.address,
+            allergies: p.allergies || [],
+            chronicConditions: p.chronicConditions || [],
+            vitals: p.vitals || {},
+            isClaimed: p.isClaimed
+          })));
+        }
       }
 
       // 4. Fetch visits if token exists
@@ -379,12 +430,17 @@ export const AppProvider = ({ children }) => {
   };
 
   // Check-In Patient & Assign Doctor (calls backend /api/visits)
-  const checkInPatient = async ({ patientId, doctorId, priority = 'Routine', reason = 'General Consultation', triageVitals = {} }) => {
+  const checkInPatient = async ({ patientId, doctorId, assignedDoctorIds, priority = 'Routine', reason = 'General Consultation', triageVitals = {} }) => {
     try {
+      const docList = assignedDoctorIds && assignedDoctorIds.length > 0
+        ? assignedDoctorIds
+        : (doctorId ? [doctorId] : [currentDoctor.id || currentDoctor._id]);
+
       const payload = {
         patientId,
         hospitalId: currentHospital.id || currentHospital._id,
-        doctorId: doctorId || currentDoctor.id || currentDoctor._id,
+        doctorId: docList[0],
+        assignedDoctorIds: docList,
         reasonForVisit: reason,
         priority,
         preliminaryVitals: triageVitals
@@ -399,6 +455,87 @@ export const AppProvider = ({ children }) => {
       }
     } catch (err) {
       showToast('Check-In Error', err.message, 'error');
+      throw err;
+    }
+  };
+
+  // Assign additional doctor to ongoing visit
+  const assignDoctorToVisit = async (visitId, doctorId) => {
+    try {
+      const res = await api.assignDoctor(visitId, doctorId);
+      if (res?.data) {
+        const mapped = mapVisitToFrontend(res.data);
+        setActiveVisits((prev) => prev.map((v) => (v.id === visitId || v._id === visitId ? mapped : v)));
+        showToast('Doctor Assigned', 'Additional doctor assigned to visit.', 'success');
+        return mapped;
+      }
+    } catch (err) {
+      showToast('Assignment Error', err.message, 'error');
+      throw err;
+    }
+  };
+
+  // Remove doctor assignment safely (if no consultation documented)
+  const removeDoctorFromVisit = async (visitId, doctorId) => {
+    try {
+      const res = await api.removeDoctorAssignment(visitId, doctorId);
+      if (res?.data) {
+        const mapped = mapVisitToFrontend(res.data);
+        setActiveVisits((prev) => prev.map((v) => (v.id === visitId || v._id === visitId ? mapped : v)));
+        showToast('Assignment Corrected', 'Doctor unassigned from visit safely.', 'info');
+        return mapped;
+      }
+    } catch (err) {
+      showToast('Correction Error', err.message, 'error');
+      throw err;
+    }
+  };
+
+  // Exact MediVault ID lookup
+  const lookupPatientByExactMediVaultId = async (mediVaultId) => {
+    try {
+      const res = await api.lookupPatientByExactMediVaultId(mediVaultId);
+      return res?.data;
+    } catch (err) {
+      showToast('Lookup Failed', err.message || 'Patient not found', 'error');
+      throw err;
+    }
+  };
+
+  // Add existing patient to current hospital directory
+  const addPatientToHospitalDirectory = async ({ patientId, mediVaultId, operationalNotes }) => {
+    try {
+      const res = await api.addPatientToHospitalDirectory({
+        patientId,
+        mediVaultId,
+        hospitalId: currentHospital.id || currentHospital._id,
+        operationalNotes
+      });
+      if (res?.data?.patient) {
+        const p = res.data.patient;
+        const mapped = {
+          id: p._id,
+          _id: p._id,
+          mediVaultId: p.mediVaultId,
+          name: p.name,
+          age: p.age || 30,
+          gender: p.gender,
+          bloodGroup: p.bloodGroup,
+          phone: p.phone,
+          email: p.email,
+          vitals: p.vitals || {},
+          dateAdded: res.data.dateAdded,
+          directoryStatus: res.data.status
+        };
+        setPatients((prev) => {
+          if (prev.some(item => item.id === mapped.id || item._id === mapped.id)) return prev;
+          return [mapped, ...prev];
+        });
+        showToast('Patient Added', `${p.name} added to this hospital directory.`, 'success');
+        return mapped;
+      }
+    } catch (err) {
+      showToast('Error', err.message, 'error');
       throw err;
     }
   };
@@ -678,6 +815,10 @@ export const AppProvider = ({ children }) => {
         removeToast,
         registerPatient,
         checkInPatient,
+        assignDoctorToVisit,
+        removeDoctorFromVisit,
+        lookupPatientByExactMediVaultId,
+        addPatientToHospitalDirectory,
         endVisit,
         requestInterHospitalConsent,
         respondConsentRequest,

@@ -5,7 +5,8 @@ const {
   getVisits,
   getVisitById,
   updateVisitStatus,
-  assignDoctor
+  assignDoctor,
+  removeDoctorAssignment
 } = require('../controllers/visitController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -17,20 +18,33 @@ router.get('/:id', getVisitById);
 // Create visit (assistant/receptionist check-in)
 router.post(
   '/',
-  restrictTo('assistant', 'receptionist', 'hospital_admin', 'super_admin'),
+  restrictTo('assistant', 'receptionist'),
   createVisit
 );
 
 router.patch(
   '/:id/status',
-  restrictTo('assistant', 'receptionist', 'doctor', 'hospital_admin', 'super_admin'),
+  restrictTo('assistant', 'receptionist', 'doctor'),
   updateVisitStatus
 );
 
+// Doctor assignment management
 router.post(
   '/:id/assign-doctor',
-  restrictTo('assistant', 'receptionist', 'hospital_admin', 'super_admin'),
+  restrictTo('assistant', 'receptionist'),
   assignDoctor
+);
+
+router.delete(
+  '/:id/assign-doctor/:doctorId',
+  restrictTo('assistant', 'receptionist'),
+  removeDoctorAssignment
+);
+
+router.post(
+  '/:id/remove-doctor',
+  restrictTo('assistant', 'receptionist'),
+  removeDoctorAssignment
 );
 
 module.exports = router;

@@ -188,6 +188,30 @@ class ApiService {
     });
   }
 
+  async removeDoctorAssignment(visitId, doctorId) {
+    return this.request(`/visits/${visitId}/remove-doctor`, {
+      method: 'POST',
+      body: { doctorId }
+    });
+  }
+
+  // --- Hospital Patient Directory ---
+  async getHospitalPatients(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request(`/hospital-patients${query ? `?${query}` : ''}`);
+  }
+
+  async lookupPatientByExactMediVaultId(mediVaultId) {
+    return this.request(`/hospital-patients/lookup?mediVaultId=${encodeURIComponent(mediVaultId)}`);
+  }
+
+  async addPatientToHospitalDirectory(data) {
+    return this.request('/hospital-patients', {
+      method: 'POST',
+      body: data
+    });
+  }
+
   // --- Doctors ---
   async getDoctors(params = {}) {
     const query = new URLSearchParams(params).toString();

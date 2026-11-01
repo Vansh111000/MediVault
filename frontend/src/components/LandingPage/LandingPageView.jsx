@@ -80,23 +80,23 @@ export const LandingPageView = ({ onOpenAuth, onNavigateToDoctor, onNavigateToAs
             </div>
 
             {/* Nav Links */}
-            <div className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-600">
-              <button onClick={onNavigateToDoctor} className="hover:text-teal-700 transition-colors">For Doctors</button>
-              <button onClick={onNavigateToAssistant} className="hover:text-teal-700 transition-colors">For Receptionists</button>
-              <button onClick={onNavigateToPortal} className="hover:text-teal-700 transition-colors">For Patient</button>
+            <div className="hidden md:flex items-center gap-12 text-sm font-semibold text-slate-700">
+              <button onClick={() => onOpenAuth ? onOpenAuth('login', 'doctor') : onNavigateToDoctor()} className="hover:text-teal-700 transition-colors cursor-pointer">Doctors</button>
+              <button onClick={() => onOpenAuth ? onOpenAuth('login', 'assistant') : onNavigateToAssistant()} className="hover:text-teal-700 transition-colors cursor-pointer">Assistants</button>
+              <button onClick={() => onOpenAuth ? onOpenAuth('login', 'patient') : onNavigateToPortal()} className="hover:text-teal-700 transition-colors cursor-pointer">Patients</button>
             </div>
 
             {/* Action buttons */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => onOpenAuth ? onOpenAuth('login') : onNavigateToPortal()}
-                className="text-xs font-semibold text-slate-700 hover:text-teal-700 px-3 py-1.5 transition-colors"
+                className="text-xs font-semibold text-slate-700 hover:text-teal-700 px-3 py-1.5 transition-colors cursor-pointer"
               >
                 Sign In
               </button>
               <button
                 onClick={() => onOpenAuth ? onOpenAuth('signup') : onNavigateToPortal()}
-                className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+                className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Get Started</span>
               </button>

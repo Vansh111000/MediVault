@@ -17,7 +17,11 @@ import {
   LogOut,
   KeyRound,
   Printer,
-  X
+  X,
+  Plus,
+  UserCheck,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { Footer } from '../Shared/Footer';
 
@@ -25,17 +29,28 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
   const {
     patients,
     doctors,
+    activeVisits,
     currentHospital,
     registerPatient,
     checkInPatient,
+    assignDoctorToVisit,
+    removeDoctorFromVisit,
+    lookupPatientByExactMediVaultId,
+    addPatientToHospitalDirectory,
     updatePatientProfile,
     showToast
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState('list'); // 'list', 'register', 'patient-detail'
+  const [activeTab, setActiveTab] = useState('list'); // 'list', 'register', 'lookup', 'patient-detail'
   const [selectedPatient, setSelectedPatient] = useState(patients[0] || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Exact MediVault ID Lookup State
+  const [exactLookupId, setExactLookupId] = useState('');
+  const [lookupResult, setLookupResult] = useState(null);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [isAddingToDirectory, setIsAddingToDirectory] = useState(false);
 
   // New Patient Slip Modal State
   const [registrationSlip, setRegistrationSlip] = useState(null);
@@ -52,6 +67,13 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
   const [assignedDoctorId, setAssignedDoctorId] = useState(doctors[0]?.id || doctors[0]?._id || '');
   const [visitReason, setVisitReason] = useState('General Consultation');
 
+  // Visit creation for selected patient
+  const [newVisitReason, setNewVisitReason] = useState('General Consultation');
+  const [newVisitPriority, setNewVisitPriority] = useState('Routine');
+  const [selectedDoctorIds, setSelectedDoctorIds] = useState(doctors[0] ? [doctors[0].id || doctors[0]._id] : []);
+  const [additionalDoctorMap, setAdditionalDoctorMap] = useState({});
+  const [isCreatingVisit, setIsCreatingVisit] = useState(false);
+
   // Edit Patient State
   const [isEditing, setIsEditing] = useState(false);
   const [editBp, setEditBp] = useState('120/80 mmHg');
@@ -63,6 +85,94 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
     (p.mediVaultId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.phone || '').includes(searchQuery)
   );
+
+  const handleExactLookup = async (e) => {
+    e?.preventDefault();
+    if (!exactLookupId.trim()) {
+      showToast('Validation Error', 'Please enter an exact MediVault ID (e.g. MV-XXXXX)', 'error');
+      return;
+    }
+    setIsLookingUp(true);
+    setLookupResult(null);
+    try {
+      const data = await lookupPatientByExactMediVaultId(exactLookupId.trim());
+      setLookupResult(data);
+    } catch (err) {
+      // Handled in toast
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
+  const handleAddExistingToDirectory = async () => {
+    if (!lookupResult?.patient?._id) return;
+    setIsAddingToDirectory(true);
+    try {
+      const added = await addPatientToHospitalDirectory({
+        patientId: lookupResult.patient._id,
+        mediVaultId: lookupResult.patient.mediVaultId
+      });
+      setSelectedPatient(added);
+      setActiveTab('patient-detail');
+      setLookupResult(null);
+      setExactLookupId('');
+    } catch (err) {
+      // Handled in toast
+    } finally {
+      setIsAddingToDirectory(false);
+    }
+  };
+
+  const handleStartNewVisit = async (e) => {
+    e.preventDefault();
+    if (!selectedPatient) return;
+    if (selectedDoctorIds.length === 0) {
+      showToast('Validation Error', 'Please select at least one attending doctor', 'error');
+      return;
+    }
+    setIsCreatingVisit(true);
+    try {
+      const visit = await checkInPatient({
+        patientId: selectedPatient.id || selectedPatient._id,
+        assignedDoctorIds: selectedDoctorIds,
+        doctorId: selectedDoctorIds[0],
+        reason: newVisitReason,
+        priority: newVisitPriority,
+        triageVitals: {
+          bp: editBp,
+          pulse: editPulse
+        }
+      });
+      showToast('Visit Created', `Token ${visit.tokenNumber} issued with ${selectedDoctorIds.length} doctor(s) assigned.`, 'success');
+      setNewVisitReason('General Consultation');
+    } catch (err) {
+      // Handled in toast
+    } finally {
+      setIsCreatingVisit(false);
+    }
+  };
+
+  const handleAddDoctorToOngoingVisit = async (visitId) => {
+    const docId = additionalDoctorMap[visitId];
+    if (!docId) {
+      showToast('Validation Error', 'Please select a doctor to assign', 'error');
+      return;
+    }
+    try {
+      await assignDoctorToVisit(visitId, docId);
+      setAdditionalDoctorMap(prev => ({ ...prev, [visitId]: '' }));
+    } catch (e) {
+      // Handled
+    }
+  };
+
+  const handleRemoveDoctorFromOngoingVisit = async (visitId, doctorId) => {
+    try {
+      await removeDoctorFromVisit(visitId, doctorId);
+    } catch (e) {
+      // Handled
+    }
+  };
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
@@ -227,6 +337,21 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
             >
               <UserPlus className="w-4 h-4" />
               <span>Register New Patient</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('lookup');
+                setLookupResult(null);
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'lookup'
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              <span>Lookup by MediVault ID</span>
             </button>
           </div>
         </div>
@@ -519,6 +644,121 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
           </div>
         )}
 
+        {/* TAB 2.5: EXACT MEDIVAULT ID LOOKUP */}
+        {activeTab === 'lookup' && (
+          <div className="max-w-2xl mx-auto bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Exact MediVault ID Lookup</h2>
+              <p className="text-xs text-slate-600 mt-1">
+                Lookup an existing patient across the MediVault network using their unique permanent MediVault ID.
+                Add returning patients to your local hospital directory without creating duplicate identities.
+              </p>
+            </div>
+
+            <form onSubmit={handleExactLookup} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. MV-2025-1001 or MV-2026-0001"
+                  value={exactLookupId}
+                  onChange={(e) => setExactLookupId(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-teal-700"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLookingUp}
+                className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+              >
+                <Search className="w-4 h-4" />
+                <span>{isLookingUp ? 'Searching...' : 'Search Patient'}</span>
+              </button>
+            </form>
+
+            {lookupResult && (
+              <div className="p-5 rounded-2xl border border-teal-200/80 bg-teal-50/40 space-y-4 animate-in fade-in">
+                <div className="flex items-center justify-between pb-3 border-b border-teal-200/60">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-700 text-white font-extrabold flex items-center justify-center text-sm">
+                      {(lookupResult.patient.name || 'P')
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">{lookupResult.patient.name}</h3>
+                      <p className="text-xs text-slate-600">
+                        Permanent ID: <span className="font-mono font-bold text-teal-800">{lookupResult.patient.mediVaultId}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      lookupResult.alreadyInDirectory
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                    }`}
+                  >
+                    {lookupResult.alreadyInDirectory ? 'In Hospital Directory' : 'External Global Patient'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Contact Phone</span>
+                    <strong className="text-slate-800">{lookupResult.patient.phone || 'Protected'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Demographics</span>
+                    <strong className="text-slate-800">
+                      {lookupResult.patient.age ? `${lookupResult.patient.age} yrs` : '—'} • {lookupResult.patient.gender || '—'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Global Identity</span>
+                    <strong className="text-slate-800">Single Verified Account</strong>
+                  </div>
+                </div>
+
+                {lookupResult.alreadyInDirectory ? (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPatient(lookupResult.patient)}
+                      className="bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>Open Patient File</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pt-2 space-y-3">
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                      <span>
+                        This patient belongs to the global MediVault network. Adding them to {currentHospital.name} will create a local hospital directory link without duplicating their permanent medical identity.
+                      </span>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleAddExistingToDirectory}
+                        disabled={isAddingToDirectory}
+                        className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>{isAddingToDirectory ? 'Adding to Directory...' : 'Add Patient to Hospital Directory'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* TAB 3: PATIENT DETAIL & TRIAGE VITALS */}
         {activeTab === 'patient-detail' && selectedPatient && (
           <div className="space-y-6">
@@ -643,6 +883,229 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* ENCOUNTERS & MULTI-DOCTOR ASSIGNMENTS */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-6">
+              <div className="border-b border-slate-100 pb-4">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Stethoscope className="w-5 h-5 text-teal-700" />
+                  <span>Hospital Encounters & Multiple Doctor Assignments</span>
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Check-in patient for a new encounter with one or more doctors, or manage doctor assignments for ongoing visits.
+                </p>
+              </div>
+
+              {/* Form: Start New Encounter with Multiple Doctors */}
+              <form onSubmit={handleStartNewVisit} className="p-5 rounded-2xl bg-teal-50/40 border border-teal-200/70 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Plus className="w-4 h-4 text-teal-700" />
+                    <span>Create New Encounter / Check-In</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-teal-800">
+                    {selectedDoctorIds.length} Doctor(s) Selected
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Reason for Visit</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Chest pain evaluation, Routine follow-up"
+                      value={newVisitReason}
+                      onChange={(e) => setNewVisitReason(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-teal-700 font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Triage Priority</label>
+                    <select
+                      value={newVisitPriority}
+                      onChange={(e) => setNewVisitPriority(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-teal-700 font-semibold"
+                    >
+                      <option value="Routine">Routine (Regular OPD)</option>
+                      <option value="Urgent">Urgent (Priority attention)</option>
+                      <option value="Emergency">Emergency (Immediate)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Multi-Doctor Selection */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1.5">
+                    Select Attending Doctor(s) <span className="text-teal-700 font-normal">(Multiple doctors can be assigned to the same visit)</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {doctors.map((doc) => {
+                      const docId = doc.id || doc._id;
+                      const isSelected = selectedDoctorIds.includes(docId);
+                      return (
+                        <label
+                          key={docId}
+                          className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                              : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedDoctorIds(prev => [...prev, docId]);
+                              } else {
+                                setSelectedDoctorIds(prev => prev.filter(id => id !== docId));
+                              }
+                            }}
+                            className="w-4 h-4 rounded text-teal-700 focus:ring-teal-500"
+                          />
+                          <div className="text-xs min-w-0">
+                            <span className="font-bold block truncate">{doc.name}</span>
+                            <span className={`text-[10px] block truncate ${isSelected ? 'text-teal-100' : 'text-slate-500'}`}>
+                              {doc.specialty || 'General Physician'}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={isCreatingVisit || selectedDoctorIds.length === 0}
+                    className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{isCreatingVisit ? 'Checking in...' : 'Check-In & Issue Token'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Existing Encounters List */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Active & Recent Hospital Encounters
+                </h4>
+
+                {(() => {
+                  const patientVisits = (activeVisits || []).filter(
+                    (v) =>
+                      v.patientId === selectedPatient.id ||
+                      v.patientId === selectedPatient._id ||
+                      v.patient?._id === selectedPatient._id ||
+                      v.patient?.mediVaultId === selectedPatient.mediVaultId
+                  );
+
+                  if (patientVisits.length === 0) {
+                    return (
+                      <div className="p-6 text-center text-slate-500 text-xs border border-dashed border-slate-200 rounded-2xl">
+                        No hospital encounters recorded yet for this patient at {currentHospital.name}.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {patientVisits.map((visit) => {
+                        const visitId = visit.id || visit._id;
+                        const assignedDocs = visit.assignedDoctors || (visit.doctorId ? [doctors.find(d => (d.id || d._id) === visit.doctorId) || { name: 'Assigned Doctor', id: visit.doctorId }] : []);
+                        
+                        return (
+                          <div key={visitId} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-1 rounded-lg bg-teal-700 text-white font-mono font-bold text-xs">
+                                  Token {visit.tokenNumber || '—'}
+                                </span>
+                                <span className="text-xs font-bold text-slate-900">{visit.reason}</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
+                                  {visit.priority || 'Routine'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>{visit.checkInTime || 'Today'} • Status: <strong>{visit.status || 'Waiting'}</strong></span>
+                              </span>
+                            </div>
+
+                            {/* Assigned Doctors */}
+                            <div className="pt-2 border-t border-slate-200/70 space-y-2">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                Assigned Attending Doctors ({assignedDocs.length})
+                              </span>
+                              
+                              <div className="flex flex-wrap gap-2 items-center">
+                                {assignedDocs.map((docItem, idx) => {
+                                  const docObj = docItem.doctor || docItem;
+                                  const docId = docObj._id || docObj.id || docObj;
+                                  const docName = docObj.name || (doctors.find(d => (d.id || d._id) === docId)?.name) || 'Attending Doctor';
+                                  const status = docItem.consultationStatus || 'assigned';
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-800 shadow-2xs"
+                                    >
+                                      <Stethoscope className="w-3.5 h-3.5 text-teal-700" />
+                                      <span className="font-bold">{docName}</span>
+                                      <span className="text-[10px] text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 font-semibold">
+                                        {status}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        title="Safely remove doctor if no consultation note recorded"
+                                        onClick={() => handleRemoveDoctorFromOngoingVisit(visitId, docId)}
+                                        className="ml-1 text-slate-400 hover:text-rose-600 transition-colors p-0.5"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Inline Add Doctor to Ongoing Visit */}
+                              <div className="flex items-center gap-2 pt-1">
+                                <select
+                                  value={additionalDoctorMap[visitId] || ''}
+                                  onChange={(e) => setAdditionalDoctorMap(prev => ({ ...prev, [visitId]: e.target.value }))}
+                                  className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-xs text-slate-800 font-medium focus:outline-none focus:border-teal-700"
+                                >
+                                  <option value="">-- Add another doctor to this visit --</option>
+                                  {doctors.map(d => {
+                                    const dId = d.id || d._id;
+                                    return (
+                                      <option key={dId} value={dId}>
+                                        {d.name} ({d.specialty || 'General'})
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddDoctorToOngoingVisit(visitId)}
+                                  className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Assign</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         )}

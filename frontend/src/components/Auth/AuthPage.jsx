@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Shield,
@@ -27,8 +27,24 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
 
   // Mode: 'login' | 'signup' (staff only) | 'claim' (patient account activation)
   const [mode, setMode] = useState(initialMode);
-  const [selectedRole, setSelectedRole] = useState('patient'); // 'patient' | 'doctor' | 'receptionist'
+  const [selectedRole, setSelectedRole] = useState('patient'); // 'patient' | 'doctor' | 'assistant'
   const [loading, setLoading] = useState(false);
+
+  // Preselect role from URL if present (?role=doctor|assistant|patient)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const roleParam = params.get('role');
+      if (roleParam) {
+        const normalized = roleParam === 'receptionist' ? 'assistant' : roleParam;
+        if (['doctor', 'assistant', 'patient'].includes(normalized)) {
+          setSelectedRole(normalized);
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }, []);
 
   // Form states
   const [email, setEmail] = useState('');
@@ -43,31 +59,6 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
   // Patient Activation Form states
   const [mediVaultId, setMediVaultId] = useState('');
   const [activationCode, setActivationCode] = useState('');
-
-  // Quick fill helper for demo accounts
-  const handleQuickFill = (role) => {
-    setSelectedRole(role);
-    setMode('login');
-    if (role === 'doctor') {
-      setEmail('doctor@medivault.com');
-      setPassword('Password123!');
-    } else if (role === 'receptionist') {
-      setEmail('reception@medivault.com');
-      setPassword('Password123!');
-    } else if (role === 'patient') {
-      setEmail('patient@medivault.com');
-      setPassword('Password123!');
-    }
-  };
-
-  const handleQuickFillClaim = () => {
-    setMode('claim');
-    setSelectedRole('patient');
-    setMediVaultId('MV-20002');
-    setActivationCode('ACT-771920');
-    setEmail('rohan.activated@example.com');
-    setPassword('Password123!');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -176,48 +167,8 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
                 ? 'Select your role to access your workspace'
                 : mode === 'claim'
                 ? 'Enter your clinic-issued MediVault ID and verification code'
-                : 'Register an authorized hospital doctor or receptionist profile'}
+                : 'Register an authorized hospital doctor or assistant profile'}
             </p>
-          </div>
-
-          {/* Quick Demo Credentials Bar */}
-          <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 space-y-2">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
-              <span className="flex items-center gap-1 text-teal-800">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Demo Quick-Fill Accounts:</span>
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('doctor')}
-                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 transition-colors"
-              >
-                🩺 Doctor
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('receptionist')}
-                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 transition-colors"
-              >
-                📋 Reception
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('patient')}
-                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 transition-colors"
-              >
-                👤 Patient (Aarav)
-              </button>
-              <button
-                type="button"
-                onClick={handleQuickFillClaim}
-                className="px-2 py-1 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg text-[10px] font-semibold text-teal-800 transition-colors"
-              >
-                🔑 Claim Demo Patient
-              </button>
-            </div>
           </div>
 
           {/* Role Selector Tabs (Only in login and staff signup mode) */}
@@ -253,15 +204,15 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
 
                 <button
                   type="button"
-                  onClick={() => setSelectedRole('receptionist')}
+                  onClick={() => setSelectedRole('assistant')}
                   className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all ${
-                    selectedRole === 'receptionist'
+                    selectedRole === 'assistant' || selectedRole === 'receptionist'
                       ? 'border-teal-700 bg-slate-100 text-slate-900 shadow-xs'
                       : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600'
                   }`}
                 >
                   <ClipboardList className="w-5 h-5 mb-1 text-teal-700" />
-                  <span>Receptionist</span>
+                  <span>Assistant</span>
                 </button>
               </div>
             </div>

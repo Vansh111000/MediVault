@@ -17,79 +17,33 @@ import MedicalRecords from "./pages/doctor/MedicalRecords";
 import Consultations from "./pages/doctor/Consultations";
 import Prescriptions from "./pages/doctor/Prescriptions";
 
-const DoctorPortal = ({ onNavigateHome }) => {
-    return (
-        <Routes>
-            <Route path="/doctor" element={<DoctorLayout onNavigateHome={onNavigateHome} />}>
-                <Route index element={<DoctorDashboard />} />
-
-                <Route path="patients/:patientId" element={<PatientWorkspace />}>
-                    <Route
-                        index
-                        element={<Navigate to="consultation" replace />}
-                    />
-
-                    <Route
-                        path="consultation"
-                        element={<ConsultationTab />}
-                    />
-
-                    <Route
-                        path="records"
-                        element={<MedicalRecordsTab />}
-                    />
-
-                    <Route
-                        path="summary"
-                        element={
-                            <Navigate to="../consultation" replace />
-                        }
-                    />
-
-                    <Route
-                        path="prescription"
-                        element={
-                            <Navigate to="../consultation" replace />
-                        }
-                    />
-                </Route>
-
-                <Route path="records" element={<MedicalRecords />} />
-
-                <Route path="consultations" element={<Consultations />} />
-
-                <Route path="prescriptions" element={<Prescriptions />} />
-            </Route>
-        </Routes>
-    );
-};
 
 const MainLayout = () => {
     const navigate = useNavigate();
-
-    const [currentView, setCurrentView] = useState("landing");
     const [authMode, setAuthMode] = useState("login");
 
-    const handleOpenAuth = (mode = "login") => {
+    const handleOpenAuth = (mode = "login", role = null) => {
         setAuthMode(mode);
-        setCurrentView("auth");
+        if (role) {
+            navigate(`/login?role=${role}`);
+        } else {
+            navigate("/login");
+        }
     };
 
     const handleNavigateToPortal = () => {
-        setCurrentView("patient");
+        navigate("/patient");
     };
 
     const handleNavigateToDoctor = () => {
-        setCurrentView("doctor");
         navigate("/doctor");
     };
 
-    const handleNavigateToReceptionist = () => {
-        setCurrentView("receptionist");
+    const handleNavigateToAssistant = () => {
+        navigate("/assistant");
     };
 
     const handleNavigateHome = () => {
-        setCurrentView("landing");
         navigate("/");
     };
 
@@ -97,48 +51,95 @@ const MainLayout = () => {
         if (role === "doctor") {
             handleNavigateToDoctor();
         } else if (role === "receptionist" || role === "assistant") {
-            setCurrentView("receptionist");
+            handleNavigateToAssistant();
         } else {
-            setCurrentView("patient");
+            handleNavigateToPortal();
         }
     };
 
     return (
         <div className="min-h-screen bg-[#f8fafc] text-slate-900 selection:bg-teal-600 selection:text-white">
-
-            {currentView === "landing" && (
-                <LandingPageView
-                    onOpenAuth={handleOpenAuth}
-                    onNavigateToDoctor={handleNavigateToDoctor}
-                    onNavigateToAssistant={handleNavigateToReceptionist}
-                    onNavigateToPortal={handleNavigateToPortal}
+            <Routes>
+                <Route
+                    path="/"
+                    element={
+                        <LandingPageView
+                            onOpenAuth={handleOpenAuth}
+                            onNavigateToDoctor={handleNavigateToDoctor}
+                            onNavigateToAssistant={handleNavigateToAssistant}
+                            onNavigateToPortal={handleNavigateToPortal}
+                        />
+                    }
                 />
-            )}
 
-            {currentView === "auth" && (
-                <AuthPage
-                    initialMode={authMode}
-                    onBack={handleNavigateHome}
-                    onAuthSuccess={handleAuthSuccess}
+                <Route
+                    path="/login"
+                    element={
+                        <AuthPage
+                            initialMode={authMode}
+                            onBack={handleNavigateHome}
+                            onAuthSuccess={handleAuthSuccess}
+                        />
+                    }
                 />
-            )}
 
-            {currentView === "doctor" && (
-                <DoctorPortal onNavigateHome={handleNavigateHome} />
-            )}
-
-            {currentView === "patient" && (
-                <PatientDashboard
-                    onLogout={handleNavigateHome}
-                    onNavigateToDoctor={handleNavigateToDoctor}
+                <Route
+                    path="/assistant"
+                    element={
+                        <ReceptionistDashboard
+                            onNavigateHome={handleNavigateHome}
+                        />
+                    }
                 />
-            )}
 
-            {currentView === "receptionist" && (
-                <ReceptionistDashboard
-                    onNavigateHome={handleNavigateHome}
+                <Route
+                    path="/receptionist"
+                    element={<Navigate to="/assistant" replace />}
                 />
-            )}
+
+                <Route
+                    path="/patient"
+                    element={
+                        <PatientDashboard
+                            onLogout={handleNavigateHome}
+                            onNavigateToDoctor={handleNavigateToDoctor}
+                        />
+                    }
+                />
+
+                <Route path="/doctor" element={<DoctorLayout onNavigateHome={handleNavigateHome} />}>
+                    <Route index element={<DoctorDashboard />} />
+
+                    <Route path="patients/:patientId" element={<PatientWorkspace />}>
+                        <Route
+                            index
+                            element={<Navigate to="consultation" replace />}
+                        />
+                        <Route
+                            path="consultation"
+                            element={<ConsultationTab />}
+                        />
+                        <Route
+                            path="records"
+                            element={<MedicalRecordsTab />}
+                        />
+                        <Route
+                            path="summary"
+                            element={<Navigate to="../consultation" replace />}
+                        />
+                        <Route
+                            path="prescription"
+                            element={<Navigate to="../consultation" replace />}
+                        />
+                    </Route>
+
+                    <Route path="records" element={<MedicalRecords />} />
+                    <Route path="consultations" element={<Consultations />} />
+                    <Route path="prescriptions" element={<Prescriptions />} />
+                </Route>
+
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
 
             <ToastContainer />
         </div>

@@ -1,4 +1,4 @@
-const { Visit, Patient, Hospital, Doctor, Consultation, Consent } = require('../models');
+const { Visit, Patient, Hospital, Doctor, Consultation, Consent, HospitalPatient } = require('../models');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -28,7 +28,11 @@ const createVisit = async (req, res, next) => {
       return errorResponse(res, 404, 'Patient not found.');
     }
 
-    const targetHospitalId = hospitalId || req.activeHospital?._id;
+    // For assistants, derive target hospital from active validated membership
+    const targetHospitalId = (['assistant', 'receptionist'].includes(req.user.role) && req.activeHospital?._id)
+      ? req.activeHospital._id
+      : (hospitalId || req.activeHospital?._id);
+
     if (!targetHospitalId) {
       return errorResponse(res, 400, 'Hospital ID is required.');
     }
@@ -69,6 +73,22 @@ const createVisit = async (req, res, next) => {
       patient.vitals = { ...patient.vitals, ...preliminaryVitals };
       await patient.save();
     }
+
+    // Update or ensure HospitalPatient directory relationship and update lastVisitAt
+    await HospitalPatient.findOneAndUpdate(
+      { hospital: hospital._id, patient: patient._id },
+      {
+        $set: {
+          lastVisitAt: new Date(),
+          status: 'active'
+        },
+        $setOnInsert: {
+          addedBy: req.user._id,
+          dateAdded: new Date()
+        }
+      },
+      { upsert: true, new: true }
+    );
 
     await logAudit({
       req,
@@ -246,7 +266,73 @@ const assignDoctor = async (req, res, next) => {
       details: `Assigned Dr. ${doctor.name} to visit ${visit._id}`
     });
 
-    return successResponse(res, 200, `Doctor ${doctor.name} assigned to visit`, visit);
+    const populated = await Visit.findById(visit._id)
+      .populate('patient', 'name mediVaultId age gender phone vitals bloodGroup')
+      .populate('hospital', 'name hospitalCode city')
+      .populate('assignedDoctors', 'name specialty');
+
+    return successResponse(res, 200, `Doctor ${doctor.name} assigned to visit`, populated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Remove an assigned doctor from a visit only when safe
+ * (i.e. no clinical consultation has been started or completed by this doctor)
+ */
+const removeDoctorAssignment = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const doctorId = req.params.doctorId || req.body.doctorId;
+
+    if (!doctorId) {
+      return errorResponse(res, 400, 'Doctor ID is required.');
+    }
+
+    const visit = await Visit.findById(id);
+    if (!visit) {
+      return errorResponse(res, 404, 'Visit not found.');
+    }
+
+    // Check if this doctor has started or completed a consultation
+    const existingConsultation = await Consultation.findOne({
+      visit: visit._id,
+      doctor: doctorId
+    });
+
+    if (existingConsultation) {
+      if (existingConsultation.status === 'completed' || (existingConsultation.clinicalNote && existingConsultation.clinicalNote.trim())) {
+        return errorResponse(
+          res,
+          400,
+          'Cannot remove doctor assignment: this doctor has already documented clinical notes for this encounter. Clinical notes must be permanently preserved.'
+        );
+      }
+      // If empty draft, safe to remove the placeholder draft
+      await Consultation.findByIdAndDelete(existingConsultation._id);
+    }
+
+    // Remove from assignedDoctors
+    visit.assignedDoctors = visit.assignedDoctors.filter(d => String(d) !== String(doctorId));
+    await visit.save();
+
+    await logAudit({
+      req,
+      hospital: visit.hospital,
+      patient: visit.patient,
+      action: 'DOCTOR_REMOVED_FROM_VISIT',
+      resourceType: 'visit',
+      resourceId: visit._id,
+      details: `Removed doctor ${doctorId} from visit ${visit._id} (safe correction)`
+    });
+
+    const populated = await Visit.findById(visit._id)
+      .populate('patient', 'name mediVaultId age gender phone vitals bloodGroup')
+      .populate('hospital', 'name hospitalCode city')
+      .populate('assignedDoctors', 'name specialty');
+
+    return successResponse(res, 200, 'Doctor assignment removed safely', populated);
   } catch (error) {
     next(error);
   }
@@ -257,5 +343,6 @@ module.exports = {
   getVisits,
   getVisitById,
   updateVisitStatus,
-  assignDoctor
+  assignDoctor,
+  removeDoctorAssignment
 };
