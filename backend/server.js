@@ -13,8 +13,17 @@ const PORT = process.env.PORT || 5001;
 
 // Security & Parsing Middleware
 app.use(helmet());
+const allowedOrigins = new Set([
+  ...(process.env.CLIENT_URL || 'http://localhost:5173').split(',').map((origin) => origin.trim()),
+  process.env.URL,
+  process.env.DEPLOY_PRIME_URL
+].filter(Boolean));
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '5mb' }));

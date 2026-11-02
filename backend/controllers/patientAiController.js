@@ -2,10 +2,9 @@ const mongoose = require('mongoose');
 const { Patient, Consultation } = require('../models');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { logAudit } = require('../utils/auditLogger');
-
+const { GoogleGenAI } = require('@google/genai')
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-
 const getPatientForUser = async (user) => {
   const profileId = user.patientProfile?._id || user.patientProfile;
   return profileId ? Patient.findOne({ _id: profileId, user: user._id }) : Patient.findOne({ user: user._id });
@@ -17,57 +16,25 @@ const requestGemini = async (prompt) => {
     error.status = 503;
     throw error;
   }
-
+  
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY})
   const controller = new AbortController();
   const timeoutMs = Number.parseInt(process.env.GEMINI_TIMEOUT_MS, 10) || 9000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': process.env.GEMINI_API_KEY
-      },
-      body: JSON.stringify({
-        model: GEMINI_MODEL,
-        input: prompt,
-        store: false,
-        generation_config: { temperature: 0.2, max_output_tokens: 400, thinking_level: 'minimal' }
-      }),
-      signal: controller.signal
+    const response = await ai.interactions.create({
+      model: "gemini-3.6-flash",
+      input: prompt+"Give answer without any aestricks and it should be concise and less token consuming.",
     });
-
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    // console.log(response.output_text)
+    const result = response.output_text;
+    if(response.status == "completed") return result;
+    if (response.status == "failed") {
       console.error(`[Gemini API] Request rejected with HTTP ${response.status}.`);
-      const providerMessage = response.status === 401 || response.status === 403
-        ? 'Gemini rejected the server API key. Check that it is valid and enabled for the Gemini API.'
-        : response.status === 404
-        ? `Gemini model "${GEMINI_MODEL}" was not found or is unavailable to this key.`
-        : response.status === 429
-        ? 'Gemini rate limit or quota reached. Wait a little and try again.'
-        : response.status === 400
-        ? 'Gemini rejected the request settings. Check the configured model and generation options.'
-        : 'Gemini could not generate the explanation right now. Please try again.';
-      const error = new Error(providerMessage);
       error.status = response.status === 429 ? 503 : 502;
       throw error;
     }
-
-    const text = (result.steps || [])
-      .filter((step) => step.type === 'model_output')
-      .flatMap((step) => step.content || [])
-      .filter((part) => part.type === 'text' && part.text)
-      .map((part) => part.text)
-      .join('\n')
-      .trim();
-
-    if (!text) {
-      const error = new Error('Gemini returned an empty explanation. Please try again.');
-      error.status = 502;
-      throw error;
-    }
-    return text;
+    return result;
   } catch (error) {
     if (error.name === 'AbortError') {
       const timeoutError = new Error(`Gemini took longer than ${Math.round(timeoutMs / 1000)} seconds. Please try again.`);
