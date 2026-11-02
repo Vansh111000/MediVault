@@ -9,7 +9,7 @@ const errorHandler = require('./middleware/errorHandler');
 const { getHealth } = require('./controllers/healthController');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Security & Parsing Middleware
 app.use(helmet());
