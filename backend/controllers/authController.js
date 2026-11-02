@@ -83,10 +83,26 @@ const login = async (req, res, next) => {
     const userObj = user.toObject();
     delete userObj.passwordHash;
 
+    if (['assistant', 'receptionist'].includes(user.role)) {
+      if (!userObj.assistantProfile || !userObj.assistantProfile.name) {
+        const asst = await Assistant.findOne({ user: user._id });
+        if (asst) {
+          userObj.assistantProfile = asst.toObject();
+          if (!user.assistantProfile) {
+            user.assistantProfile = asst._id;
+            await user.save();
+          }
+        }
+      }
+    }
+
+    const activeHospital = memberships.length > 0 ? memberships[0].hospital : null;
+
     return successResponse(res, 200, 'Login successful', {
       token,
       user: userObj,
-      memberships
+      memberships,
+      activeHospital
     });
   } catch (error) {
     next(error);
@@ -100,6 +116,13 @@ const getMe = async (req, res, next) => {
   try {
     const userObj = req.user.toObject();
     delete userObj.passwordHash;
+
+    if (['assistant', 'receptionist'].includes(req.user.role)) {
+      if (!userObj.assistantProfile || !userObj.assistantProfile.name) {
+        const asst = await Assistant.findOne({ user: req.user._id });
+        if (asst) userObj.assistantProfile = asst.toObject();
+      }
+    }
 
     return successResponse(res, 200, 'Current user retrieved', {
       user: userObj,
@@ -228,6 +251,11 @@ const registerStaff = async (req, res, next) => {
     const token = signToken(newUser._id, newUser.role);
     const userObj = newUser.toObject();
     delete userObj.passwordHash;
+    if (role === 'doctor') {
+      userObj.doctorProfile = doctorProfile.toObject();
+    } else {
+      userObj.assistantProfile = assistantProfile.toObject();
+    }
 
     return successResponse(res, 201, 'Staff account registered successfully', {
       token,
@@ -313,6 +341,11 @@ const claimPatientAccount = async (req, res, next) => {
     const token = signToken(newUser._id, newUser.role);
     const userObj = newUser.toObject();
     delete userObj.passwordHash;
+    if (role === 'doctor') {
+      userObj.doctorProfile = doctorProfile.toObject();
+    } else {
+      userObj.assistantProfile = assistantProfile.toObject();
+    }
 
     return successResponse(res, 200, 'Patient account activated successfully! You are now logged in.', {
       token,

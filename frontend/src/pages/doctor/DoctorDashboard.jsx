@@ -48,11 +48,18 @@ function mapVisit(v) {
         bloodGroup: patient.bloodGroup || "--",
         status: v.status === "in_queue" ? "waiting"
             : v.status === "completed" ? "completed"
+            : v.status === "scheduled" ? "upcoming"
             : "checked-in",
-        time: v.checkInTime
-            ? new Date(v.checkInTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-            : "Now",
-        visitType: "new",
+        rawStatus: v.status || "checked_in",
+        appointmentDate: v.appointmentDate,
+        appointmentTime: v.appointmentTime,
+        checkInTime: v.checkInTime,
+        time: v.appointmentTime || (v.checkInTime ? new Date(v.checkInTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "Scheduled"),
+        visitType: v.visitType || "New Consultation",
+        reasonForVisit: v.reasonForVisit || "General Consultation",
+        reportedSymptoms: v.reportedSymptoms || "",
+        preliminaryVitals: v.preliminaryVitals || {},
+        priority: v.priority || "Routine",
         tokenNumber: v.tokenNumber || "",
         hasAllergy: (patient.allergies || []).length > 0,
     };

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User, HospitalMembership, Hospital } = require('../models');
+const { User, HospitalMembership, Hospital, Assistant } = require('../models');
 const { errorResponse } = require('../utils/apiResponse');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'medivault_super_secret_jwt_key_2025';
@@ -33,6 +33,16 @@ const protect = async (req, res, next) => {
       return errorResponse(res, 403, 'Your account is currently inactive or suspended.');
     }
 
+    // Ensure assistant profile is resolved and populated
+    if (['assistant', 'receptionist'].includes(user.role)) {
+      if (!user.assistantProfile || !user.assistantProfile.name) {
+        const asst = await Assistant.findOne({ user: user._id });
+        if (asst) {
+          user.assistantProfile = asst;
+        }
+      }
+    }
+
     // Attach user to req
     req.user = user;
 
@@ -61,7 +71,10 @@ const protect = async (req, res, next) => {
             req.activeHospital = hospital;
           }
         }
-      } else if (memberships.length > 0) {
+      }
+
+      // If requested hospital is not in user's memberships or was stale, default to user's primary membership
+      if (!req.activeHospital && memberships.length > 0) {
         req.activeHospital = memberships[0].hospital;
         req.activeMembership = memberships[0];
       }

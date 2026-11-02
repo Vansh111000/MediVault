@@ -87,7 +87,21 @@ async function resolveDoctor(user) {
  */
 const createVisit = async (req, res, next) => {
   try {
-    const { patientId, assignedDoctorIds, doctorId, reasonForVisit, reportedSymptoms, preliminaryVitals, priority } = req.body;
+    const {
+      patientId,
+      assignedDoctorIds,
+      doctorId,
+      reasonForVisit,
+      reason,
+      reportedSymptoms,
+      symptoms,
+      preliminaryVitals,
+      triageVitals,
+      priority,
+      appointmentDate,
+      appointmentTime,
+      visitType
+    } = req.body;
 
     if (!patientId) return errorResponse(res, 400, 'Patient ID is required.');
 
@@ -117,21 +131,39 @@ const createVisit = async (req, res, next) => {
       if (!validation.valid) return errorResponse(res, 403, validation.message);
     }
 
+    const isScheduled = req.body.status === 'scheduled' ||
+      (appointmentDate && new Date(appointmentDate).setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0));
+    const visitStatus = req.body.status || (isScheduled ? 'scheduled' : 'in_queue');
+
+    const finalCheckInTime = visitStatus === 'scheduled'
+      ? null
+      : (req.body.checkInTime ? new Date(req.body.checkInTime) : new Date());
+
     const visitPriority = priority || 'Routine';
     const tokenPrefix = visitPriority === 'Emergency' ? 'E' : visitPriority === 'Urgent' ? 'U' : 'R';
-    const tokenNumber = `${tokenPrefix}-${Math.floor(100 + Math.random() * 900)}`;
+    const tokenNumber = visitStatus === 'scheduled'
+      ? (req.body.tokenNumber || `APT-${Math.floor(100 + Math.random() * 900)}`)
+      : `${tokenPrefix}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const visitDate = appointmentDate ? new Date(appointmentDate) : new Date();
+    const vitalsData = preliminaryVitals || triageVitals || patient.vitals || {};
+    const finalReason = reasonForVisit || reason || 'General Consultation';
+    const finalSymptoms = reportedSymptoms || symptoms || '';
 
     const visit = await Visit.create({
       patient: patient._id,
       hospital: hospital._id,
-      checkInTime: new Date(),
-      reasonForVisit: reasonForVisit || 'General Consultation',
-      reportedSymptoms: reportedSymptoms || '',
-      preliminaryVitals: preliminaryVitals || patient.vitals || {},
+      checkInTime: finalCheckInTime,
+      appointmentDate: visitDate,
+      appointmentTime: appointmentTime || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      visitType: visitType || 'New Consultation',
+      reasonForVisit: finalReason,
+      reportedSymptoms: finalSymptoms,
+      preliminaryVitals: vitalsData,
       assignedDoctors: doctorIds,
       tokenNumber,
       priority: visitPriority,
-      status: 'in_queue',
+      status: visitStatus,
       createdBy: req.user._id
     });
 
@@ -155,10 +187,12 @@ const createVisit = async (req, res, next) => {
       hospitalName: hospital.name,
       patient: patient._id,
       patientIdentifier: patient.mediVaultId,
-      action: 'VISIT_CREATED',
+      action: visitStatus === 'scheduled' ? 'APPOINTMENT_SCHEDULED' : 'VISIT_CREATED',
       resourceType: 'visit',
       resourceId: visit._id,
-      details: `Checked in patient ${patient.name} with Token ${tokenNumber} (${visitPriority})`
+      details: visitStatus === 'scheduled'
+        ? `Scheduled appointment for patient ${patient.name} (${tokenNumber}) on ${visitDate.toISOString().split('T')[0]}`
+        : `Checked in patient ${patient.name} with Token ${tokenNumber} (${visitPriority})`
     });
 
     const populatedVisit = await Visit.findById(visit._id)
@@ -166,7 +200,11 @@ const createVisit = async (req, res, next) => {
       .populate('hospital', 'name hospitalCode city')
       .populate('assignedDoctors', 'name specialty');
 
-    return successResponse(res, 201, `Patient checked in with Token ${tokenNumber}`, populatedVisit);
+    const msg = visitStatus === 'scheduled'
+      ? `Appointment scheduled with Reference ${tokenNumber}`
+      : `Patient checked in with Token ${tokenNumber}`;
+
+    return successResponse(res, 201, msg, populatedVisit);
   } catch (error) {
     next(error);
   }
@@ -256,6 +294,22 @@ const getVisitById = async (req, res, next) => {
     if (req.user.role === 'doctor') {
       const doctor = await resolveDoctor(req.user);
       if (!doctor) return errorResponse(res, 403, 'Doctor profile not found.');
+      if (doctor.status !== 'active') {
+        return errorResponse(res, 403, 'Doctor profile is not active. Inactive doctors cannot access clinical visits.');
+      }
+
+      // Check active hospital membership at visit's hospital
+      const visitHospitalId = visit.hospital?._id || visit.hospital;
+      const membership = await HospitalMembership.findOne({
+        user: req.user._id,
+        hospital: visitHospitalId,
+        role: 'doctor',
+        status: 'active'
+      });
+      if (!membership) {
+        return errorResponse(res, 403, 'You do not have active hospital membership at this hospital.');
+      }
+
       // Doctor must be assigned to this visit
       const isAssigned = visit.assignedDoctors.some(d => String(d._id || d) === String(doctor._id));
       if (!isAssigned) {
@@ -300,6 +354,16 @@ const updateVisitStatus = async (req, res, next) => {
     }
 
     visit.status = status;
+    if (['checked_in', 'in_queue'].includes(status)) {
+      if (!visit.checkInTime) {
+        visit.checkInTime = new Date();
+      }
+      if (!visit.tokenNumber || visit.tokenNumber.startsWith('APT-')) {
+        const visitPriority = visit.priority || 'Routine';
+        const tokenPrefix = visitPriority === 'Emergency' ? 'E' : visitPriority === 'Urgent' ? 'U' : 'R';
+        visit.tokenNumber = `${tokenPrefix}-${Math.floor(100 + Math.random() * 900)}`;
+      }
+    }
     if (status === 'completed') {
       visit.dischargeTime = new Date();
       await Consent.updateMany(

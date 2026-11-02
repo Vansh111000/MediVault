@@ -29,6 +29,7 @@ export const AppProvider = ({ children }) => {
   const [activeDoctorId, setActiveDoctorId] = useState(null);
   const [activeAssistantId, setActiveAssistantId] = useState(null);
   const [authenticatedDoctorProfile, setAuthenticatedDoctorProfile] = useState(null);
+  const [authenticatedAssistantProfile, setAuthenticatedAssistantProfile] = useState(null);
   const [authenticatedHospital, setAuthenticatedHospital] = useState(null);
 
   // Data Stores (backed by MongoDB Atlas via API)
@@ -67,18 +68,29 @@ export const AppProvider = ({ children }) => {
     _id: v._id,
     patientId: v.patient?._id || v.patient?.id || v.patient,
     patientName: v.patient?.name || 'Unknown Patient',
+    patient: v.patient,
     hospitalId: v.hospital?._id || v.hospital?.id || v.hospital,
-    hospitalName: v.hospital?.name || 'CityCare General Hospital',
+    hospitalName: v.hospital?.name || 'Medical Center',
+    hospital: v.hospital,
     assignedDoctors: v.assignedDoctors || [],
-    assignedDoctorId: v.assignedDoctors?.[0]?._id || v.assignedDoctors?.[0] || 'DOC-001',
-    assignedDoctorName: v.assignedDoctors?.[0]?.name || 'Dr. Sarah Sharma, MD',
-    specialty: v.assignedDoctors?.[0]?.specialty || 'Cardiology',
-    checkInTime: v.checkInTime || v.createdAt,
+    assignedDoctorId: v.assignedDoctors?.[0]?._id || v.assignedDoctors?.[0] || '',
+    assignedDoctorName: v.assignedDoctors?.[0]?.name || 'Attending Physician',
+    specialty: v.assignedDoctors?.[0]?.specialty || 'General',
+    checkInTime: v.checkInTime || null,
+    appointmentDate: v.appointmentDate || v.checkInTime || v.createdAt,
+    appointmentTime: v.appointmentTime || '',
+    visitType: v.visitType || 'New Consultation',
     priority: v.priority || 'Routine',
-    status: v.status === 'in_queue' ? 'In Doctor Queue' : v.status === 'completed' ? 'Completed' : 'Checked In',
-    tokenNumber: v.tokenNumber || 'R-101',
+    status: v.status === 'in_queue' ? 'In Doctor Queue'
+      : v.status === 'completed' ? 'Completed'
+      : v.status === 'scheduled' ? 'Scheduled'
+      : 'Checked In',
+    rawStatus: v.status || 'checked_in',
+    tokenNumber: v.tokenNumber || '',
     triageVitals: v.preliminaryVitals || {},
-    reasonForVisit: v.reasonForVisit || 'General Consultation'
+    preliminaryVitals: v.preliminaryVitals || {},
+    reasonForVisit: v.reasonForVisit || 'General Consultation',
+    reportedSymptoms: v.reportedSymptoms || ''
   });
 
   // Helper: map backend consent to frontend shape
@@ -262,6 +274,13 @@ export const AppProvider = ({ children }) => {
               setAuthenticatedHospital(res.data.activeHospital);
             }
 
+            if (u.assistantProfile) {
+              setAuthenticatedAssistantProfile(u.assistantProfile);
+              setActiveAssistantId(u.assistantProfile._id || u.assistantProfile.id);
+            } else {
+              setAuthenticatedAssistantProfile(null);
+            }
+
             if (mappedRole === 'doctor') {
               try {
                 const docDash = await api.getDoctorDashboard();
@@ -290,7 +309,7 @@ export const AppProvider = ({ children }) => {
   const currentHospital = authenticatedHospital || hospitals.find((h) => h.id === activeHospitalId || h._id === activeHospitalId) || hospitals[0] || null;
   const currentPatient = patients.find((p) => p.id === activePatientId || p._id === activePatientId || p.mediVaultId === activePatientId) || patients[0] || null;
   const currentDoctor = authenticatedDoctorProfile || doctors.find((d) => d.id === activeDoctorId || d._id === activeDoctorId) || doctors[0] || null;
-  const currentAssistant = assistants.find((a) => a.id === activeAssistantId || a._id === activeAssistantId) || assistants[0] || null;
+  const currentAssistant = authenticatedAssistantProfile || null;
 
   // Switch role and update session
   const switchRole = (role) => {
@@ -326,6 +345,12 @@ export const AppProvider = ({ children }) => {
         if (u.doctorProfile) {
           setActiveDoctorId(u.doctorProfile._id || u.doctorProfile);
         }
+        if (u.assistantProfile) {
+          setAuthenticatedAssistantProfile(u.assistantProfile);
+          setActiveAssistantId(u.assistantProfile._id || u.assistantProfile.id);
+        } else {
+          setAuthenticatedAssistantProfile(null);
+        }
 
         if (mappedRole === 'doctor') {
           try {
@@ -349,14 +374,25 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Sign Out
+  // Sign Out - rigorously clear all authenticated user, assistant, doctor, and hospital states
   const logout = () => {
     api.logout();
     setCurrentUser(null);
     setIsAuthenticated(false);
     setCurrentRole('patient');
     setAuthenticatedDoctorProfile(null);
+    setAuthenticatedAssistantProfile(null);
     setAuthenticatedHospital(null);
+    setActiveHospitalIdState(null);
+    setActivePatientId(null);
+    setActiveDoctorId(null);
+    setActiveAssistantId(null);
+    setPatients([]);
+    setDoctors([]);
+    setActiveVisits([]);
+    setRecords([]);
+    setConsentRequests([]);
+    setAuditLogs([]);
     showToast('Signed Out', 'You have been logged out of MediVault.', 'info');
   };
 
@@ -367,8 +403,13 @@ export const AppProvider = ({ children }) => {
       if (res?.data) {
         const u = res.data.user;
         setCurrentUser(u);
-        setCurrentRole(u.role === 'receptionist' ? 'assistant' : u.role);
+        const mappedRole = u.role === 'receptionist' ? 'assistant' : u.role;
+        setCurrentRole(mappedRole);
         setIsAuthenticated(true);
+        if (u.assistantProfile) {
+          setAuthenticatedAssistantProfile(u.assistantProfile);
+          setActiveAssistantId(u.assistantProfile._id || u.assistantProfile.id);
+        }
         await loadBackendData();
         showToast('Registration Successful', `Welcome to MediVault, ${staffData.name}!`, 'success');
         return res.data;
@@ -459,33 +500,62 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Check-In Patient & Assign Doctor (calls backend /api/visits)
-  const checkInPatient = async ({ patientId, doctorId, assignedDoctorIds, priority = 'Routine', reason = 'General Consultation', triageVitals = {} }) => {
+  // Check-In Patient or Schedule Appointment (calls backend /api/visits)
+  const checkInPatient = async ({
+    patientId,
+    doctorId,
+    assignedDoctorIds,
+    appointmentDate,
+    appointmentTime,
+    visitType,
+    priority = 'Routine',
+    reason = 'General Consultation',
+    reasonForVisit,
+    symptoms = '',
+    reportedSymptoms,
+    status,
+    triageVitals = {},
+    preliminaryVitals = {}
+  }) => {
     try {
       // Build doctor list from what was explicitly passed – no mock fallback
       const docList = assignedDoctorIds && assignedDoctorIds.length > 0
         ? assignedDoctorIds
         : (doctorId ? [doctorId] : []);
 
+      const vitalsPayload = Object.keys(preliminaryVitals).length > 0 ? preliminaryVitals : triageVitals;
+
       const payload = {
         patientId,
         // hospitalId intentionally omitted here – backend derives it from authenticated membership
         ...(docList[0] && { doctorId: docList[0] }),
         assignedDoctorIds: docList,
-        reasonForVisit: reason,
+        appointmentDate,
+        appointmentTime,
+        visitType: visitType || 'New Consultation',
+        reasonForVisit: reasonForVisit || reason,
+        reportedSymptoms: reportedSymptoms || symptoms,
         priority,
-        preliminaryVitals: triageVitals
+        status,
+        preliminaryVitals: vitalsPayload
       };
 
       const res = await api.createVisit(payload);
       if (res?.data) {
         const mapped = mapVisitToFrontend(res.data);
         setActiveVisits((prev) => [mapped, ...prev]);
-        showToast('Patient Checked In', `Token ${mapped.tokenNumber} issued for ${mapped.assignedDoctorName}`, 'success');
+        const isScheduled = res.data.status === 'scheduled';
+        showToast(
+          isScheduled ? 'Appointment Scheduled' : 'Patient Checked In',
+          isScheduled
+            ? `Appointment reference ${mapped.tokenNumber} scheduled for ${mapped.assignedDoctorName}`
+            : `Token ${mapped.tokenNumber} issued for ${mapped.assignedDoctorName}`,
+          'success'
+        );
         return mapped;
       }
     } catch (err) {
-      showToast('Check-In Error', err.message, 'error');
+      showToast('Encounter Error', err.message, 'error');
       throw err;
     }
   };
@@ -842,6 +912,7 @@ export const AppProvider = ({ children }) => {
         toasts,
 
         // Operations
+        loadBackendData,
         showToast,
         removeToast,
         registerPatient,

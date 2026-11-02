@@ -15,22 +15,59 @@ import {
   Activity,
   Save,
   LogOut,
-  KeyRound,
   Printer,
   X,
   Plus,
   UserCheck,
   AlertCircle,
-  Clock
+  Clock,
+  Calendar,
+  FileText,
+  Check,
+  ChevronRight
 } from 'lucide-react';
 import { Footer } from '../Shared/Footer';
 
+function getGreeting(date) {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function getInitials(name) {
+  return (name || 'A')
+    .replace(/^Dr\.?\s*/i, '')
+    .split(' ')
+    .map((n) => n[0] || '')
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'A';
+}
+
+function getTodayString() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentTimeString() {
+  const d = new Date();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 export const ReceptionistDashboard = ({ onNavigateHome }) => {
   const {
+    currentUser,
+    currentAssistant,
+    currentHospital,
     patients,
     doctors,
     activeVisits,
-    currentHospital,
     registerPatient,
     checkInPatient,
     assignDoctorToVisit,
@@ -38,10 +75,13 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
     lookupPatientByExactMediVaultId,
     addPatientToHospitalDirectory,
     updatePatientProfile,
+    loadBackendData,
+    logout,
     showToast
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState('list'); // 'list', 'register', 'lookup', 'patient-detail'
+  const [now] = useState(() => new Date());
+  const [activeTab, setActiveTab] = useState('list'); // 'list', 'appointment', 'register', 'lookup', 'patient-detail'
   const [selectedPatient, setSelectedPatient] = useState(patients[0] || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,10 +92,10 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [isAddingToDirectory, setIsAddingToDirectory] = useState(false);
 
-  // New Patient Slip Modal State
+  // New Patient Slip Modal State (Registration without auto-appointment)
   const [registrationSlip, setRegistrationSlip] = useState(null);
 
-  // New Patient Form State
+  // New Patient Registration Form State (strictly global patient identity creation)
   const [newName, setNewName] = useState('');
   const [newAge, setNewAge] = useState('');
   const [newGender, setNewGender] = useState('Male');
@@ -64,21 +104,41 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
   const [newBloodGroup, setNewBloodGroup] = useState('O+');
   const [newHistory, setNewHistory] = useState('');
   const [newAllergies, setNewAllergies] = useState('');
-  const [assignedDoctorId, setAssignedDoctorId] = useState(doctors[0]?.id || doctors[0]?._id || '');
-  const [visitReason, setVisitReason] = useState('General Consultation');
 
-  // Visit creation for selected patient
+  // Add Patient Appointment State
+  const [aptPatient, setAptPatient] = useState(null);
+  const [aptSearchQuery, setAptSearchQuery] = useState('');
+  const [aptDoctorId, setAptDoctorId] = useState('');
+  const [aptDate, setAptDate] = useState(getTodayString());
+  const [aptTime, setAptTime] = useState(getCurrentTimeString());
+  const [aptVisitType, setAptVisitType] = useState('New Consultation');
+  const [aptReason, setAptReason] = useState('General Consultation');
+  const [aptSymptoms, setAptSymptoms] = useState('');
+  const [aptPriority, setAptPriority] = useState('Routine');
+  const [aptCheckInNow, setAptCheckInNow] = useState(true);
+  const [aptBp, setAptBp] = useState('120/80 mmHg');
+  const [aptPulse, setAptPulse] = useState('72 bpm');
+  const [aptTemp, setAptTemp] = useState('98.6 °F');
+  const [aptSpO2, setAptSpO2] = useState('98%');
+  const [aptWeight, setAptWeight] = useState('70 kg');
+  const [aptHeight, setAptHeight] = useState('172 cm');
+  const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
+
+  // Multi-doctor visit creation from Patient Detail view
   const [newVisitReason, setNewVisitReason] = useState('General Consultation');
   const [newVisitPriority, setNewVisitPriority] = useState('Routine');
   const [selectedDoctorIds, setSelectedDoctorIds] = useState(doctors[0] ? [doctors[0].id || doctors[0]._id] : []);
   const [additionalDoctorMap, setAdditionalDoctorMap] = useState({});
   const [isCreatingVisit, setIsCreatingVisit] = useState(false);
 
-  // Edit Patient State
+  // Edit Patient Triage Vitals State
   const [isEditing, setIsEditing] = useState(false);
   const [editBp, setEditBp] = useState('120/80 mmHg');
   const [editPulse, setEditPulse] = useState('72 bpm');
   const [editNotes, setEditNotes] = useState('');
+
+  const assistantName = currentAssistant?.name || currentUser?.name || currentUser?.email?.split('@')[0] || 'Assistant';
+  const hospitalName = currentHospital?.name || 'MediVault Health Network';
 
   const filteredPatients = patients.filter((p) =>
     (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -86,6 +146,18 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
     (p.phone || '').includes(searchQuery)
   );
 
+  const aptFilteredPatients = patients.filter((p) =>
+    (p.name || '').toLowerCase().includes(aptSearchQuery.toLowerCase()) ||
+    (p.mediVaultId || '').toLowerCase().includes(aptSearchQuery.toLowerCase()) ||
+    (p.phone || '').includes(aptSearchQuery)
+  );
+
+  const handleLogout = () => {
+    logout();
+    if (onNavigateHome) onNavigateHome();
+  };
+
+  // Exact Lookup for Global Patient
   const handleExactLookup = async (e) => {
     e?.preventDefault();
     if (!exactLookupId.trim()) {
@@ -104,18 +176,25 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
     }
   };
 
-  const handleAddExistingToDirectory = async () => {
-    if (!lookupResult?.patient?._id) return;
+  // Add Global Patient to Current Hospital Directory
+  const handleAddExistingToDirectory = async (patientToLink = null) => {
+    const targetPatient = patientToLink || lookupResult?.patient;
+    if (!targetPatient?._id) return;
     setIsAddingToDirectory(true);
     try {
       const added = await addPatientToHospitalDirectory({
-        patientId: lookupResult.patient._id,
-        mediVaultId: lookupResult.patient.mediVaultId
+        patientId: targetPatient._id,
+        mediVaultId: targetPatient.mediVaultId
       });
       setSelectedPatient(added);
-      setActiveTab('patient-detail');
+      if (patientToLink) {
+        setAptPatient(added);
+      } else {
+        setActiveTab('patient-detail');
+      }
       setLookupResult(null);
       setExactLookupId('');
+      if (loadBackendData) await loadBackendData();
     } catch (err) {
       // Handled in toast
     } finally {
@@ -123,6 +202,119 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
     }
   };
 
+  // Register New Global Patient (Strictly No Auto-Appointment)
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    if (!newName.trim() || !newPhone.trim()) {
+      showToast('Validation Error', 'Patient name and phone number are required', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const created = await registerPatient({
+        name: newName.trim(),
+        age: parseInt(newAge, 10) || 30,
+        gender: newGender,
+        phone: newPhone.trim(),
+        email: newEmail.trim() || `${newName.toLowerCase().replace(/\s+/g, '')}@medivault.io`,
+        bloodGroup: newBloodGroup,
+        chronicConditions: newHistory ? [newHistory] : [],
+        allergies: newAllergies ? [{ allergen: newAllergies, reaction: 'Moderate', severity: 'Mild' }] : []
+      });
+
+      // Show Patient Registration Verification Slip (No visit or token auto-created)
+      setRegistrationSlip({
+        name: created.name,
+        mediVaultId: created.mediVaultId,
+        activationCode: created.activationCode,
+        phone: created.phone,
+        bloodGroup: created.bloodGroup,
+        createdPatient: created
+      });
+
+      // Reset form
+      setNewName('');
+      setNewAge('');
+      setNewPhone('');
+      setNewEmail('');
+      setNewHistory('');
+      setNewAllergies('');
+      setSelectedPatient(created);
+    } catch (err) {
+      // Error handled in toast
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Create Appointment Workflow Submission
+  const handleCreateAppointmentSubmit = async (e) => {
+    e.preventDefault();
+    if (!aptPatient) {
+      showToast('Validation Error', 'Please select a patient for the appointment', 'error');
+      return;
+    }
+
+    const docId = aptDoctorId || doctors[0]?.id || doctors[0]?._id;
+    if (!docId) {
+      showToast('Validation Error', 'Please select an authorized consulting doctor', 'error');
+      return;
+    }
+
+    setIsCreatingAppointment(true);
+    try {
+      const isToday = aptDate === getTodayString();
+      const status = aptCheckInNow && isToday ? 'in_queue' : 'scheduled';
+
+      const preliminaryVitals = {
+        bp: aptBp,
+        pulse: aptPulse,
+        temp: aptTemp,
+        spO2: aptSpO2,
+        weight: aptWeight,
+        height: aptHeight
+      };
+
+      const visit = await checkInPatient({
+        patientId: aptPatient.id || aptPatient._id,
+        doctorId: docId,
+        assignedDoctorIds: [docId],
+        appointmentDate: aptDate,
+        appointmentTime: aptTime,
+        visitType: aptVisitType,
+        reason: aptReason,
+        reasonForVisit: aptReason,
+        symptoms: aptSymptoms,
+        reportedSymptoms: aptSymptoms,
+        priority: aptPriority,
+        status,
+        preliminaryVitals
+      });
+
+      showToast(
+        status === 'scheduled' ? 'Appointment Scheduled' : 'Patient Checked In',
+        status === 'scheduled'
+          ? `Appointment ${visit.tokenNumber} scheduled for ${visit.assignedDoctorName} on ${aptDate}`
+          : `Token ${visit.tokenNumber} issued. Patient placed in ${visit.assignedDoctorName}'s active queue.`,
+        'success'
+      );
+
+      // Navigate to patient detail
+      setSelectedPatient(aptPatient);
+      setActiveTab('patient-detail');
+      // Reset appointment form
+      setAptPatient(null);
+      setAptReason('General Consultation');
+      setAptSymptoms('');
+    } catch (err) {
+      // Error handled in toast
+    } finally {
+      setIsCreatingAppointment(false);
+    }
+  };
+
+  // Start Multi-Doctor Encounter from Patient Detail View
   const handleStartNewVisit = async (e) => {
     e.preventDefault();
     if (!selectedPatient) return;
@@ -174,66 +366,6 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
     }
   };
 
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    if (!newName || !newPhone) {
-      showToast('Validation Error', 'Patient name and phone number are required', 'error');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const created = await registerPatient({
-        name: newName,
-        age: parseInt(newAge, 10) || 30,
-        gender: newGender,
-        phone: newPhone,
-        email: newEmail || `${newName.toLowerCase().replace(/\s+/g, '')}@medivault.io`,
-        bloodGroup: newBloodGroup,
-        chronicConditions: newHistory ? [newHistory] : [],
-        allergies: newAllergies ? [{ allergen: newAllergies, reaction: 'Moderate', severity: 'Mild' }] : []
-      });
-
-      let tokenNumber = 'R-101';
-      let doctorName = 'Attending Doctor';
-
-      if (assignedDoctorId && created) {
-        const visit = await checkInPatient({
-          patientId: created.id || created._id,
-          doctorId: assignedDoctorId,
-          priority: 'Routine',
-          reason: visitReason
-        });
-        if (visit?.tokenNumber) tokenNumber = visit.tokenNumber;
-        const doc = doctors.find((d) => d.id === assignedDoctorId || d._id === assignedDoctorId);
-        if (doc) doctorName = doc.name;
-      }
-
-      // Show the Patient Account Slip modal so receptionist can print or read code to patient
-      setRegistrationSlip({
-        name: created.name,
-        mediVaultId: created.mediVaultId,
-        activationCode: created.activationCode,
-        phone: created.phone,
-        doctorName,
-        tokenNumber
-      });
-
-      // Reset Form
-      setNewName('');
-      setNewAge('');
-      setNewPhone('');
-      setNewEmail('');
-      setNewHistory('');
-      setNewAllergies('');
-      setSelectedPatient(created);
-    } catch (err) {
-      // Toast already shown
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleSelectPatient = (patient) => {
     setSelectedPatient(patient);
     setEditBp(patient.vitals?.bp || '120/80 mmHg');
@@ -265,7 +397,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
         <div className="w-full px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={onNavigateHome}
+              onClick={handleLogout}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-teal-700 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -279,29 +411,50 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
               <div>
                 <span className="font-bold text-slate-900 block leading-tight">MediVault</span>
                 <span className="text-[10px] font-semibold text-teal-700 uppercase tracking-wider">
-                  RECEPTIONIST & ADMISSIONS DESK
+                  ASSISTANT & ADMISSIONS DESK
                 </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-              <Building2 className="w-3.5 h-3.5 text-teal-700" />
-              <span>{currentHospital.name}</span>
+            {/* Authenticated Assistant Identity Pill */}
+            <div className="flex items-center gap-2.5 mr-1">
+              <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-extrabold flex items-center justify-center text-xs border border-teal-200">
+                {getInitials(assistantName)}
+              </div>
+              <div className="hidden md:block text-left text-xs">
+                <div className="font-bold text-slate-900">{assistantName}</div>
+                <div className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]">
+                  {currentAssistant?.employeeId ? `${currentAssistant.employeeId} • ` : ''}{hospitalName}
+                </div>
+              </div>
             </div>
 
+            {/* Action 1: Add Patient Appointment */}
+            <button
+              onClick={() => {
+                setActiveTab('appointment');
+                if (!aptPatient && selectedPatient) setAptPatient(selectedPatient);
+              }}
+              className="bg-white hover:bg-slate-50 text-teal-700 border border-teal-200 hover:border-teal-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+            >
+              <Calendar className="w-3.5 h-3.5 text-teal-700" />
+              <span>Add Patient Appointment</span>
+            </button>
+
+            {/* Action 2: Add Patient (Registration) */}
             <button
               onClick={() => setActiveTab('register')}
               className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>Add New Patient</span>
+              <span>Add Patient</span>
             </button>
 
             <button
-              onClick={onNavigateHome}
-              className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-xs font-bold transition-colors ml-2 py-1 px-1.5"
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-xs font-bold transition-colors ml-1 py-1 px-1.5"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Logout</span>
@@ -311,10 +464,22 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
       </nav>
 
       {/* Main Container */}
-      <div className="w-full px-4 sm:px-6 lg:px-10 pt-8 space-y-6 flex-1">
+      <div className="w-full px-4 sm:px-6 lg:px-10 pt-6 space-y-5 flex-1">
+        {/* Assistant Welcome Greeting Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
+          <div>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              {getGreeting(now)}, {assistantName}
+            </h1>
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              {hospitalName} Admissions Desk • {patients.length} patient{patients.length !== 1 ? 's' : ''} in directory
+            </p>
+          </div>
+        </div>
+
         {/* Navigation Tabs */}
         <div className="flex items-center justify-between gap-4 border-b border-slate-200/80 pb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap gap-2">
             <button
               onClick={() => setActiveTab('list')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
@@ -324,7 +489,19 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>All Patients ({patients.length})</span>
+              <span>Hospital Directory ({patients.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('appointment')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'appointment'
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Add Patient Appointment</span>
             </button>
 
             <button
@@ -362,26 +539,26 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Hospital Patient Directory</h2>
-                <p className="text-xs text-slate-700 font-medium">
-                  Search permanent MediVault identities or register new clinic encounters.
+                <p className="text-xs text-slate-600 font-medium">
+                  Isolated to {hospitalName}. Search existing hospital patients or book appointments.
                 </p>
               </div>
 
               <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search patient by MediVault ID, name, or phone..."
+                  placeholder="Search by MediVault ID, name, or phone..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 placeholder-slate-500 font-medium focus:outline-none focus:border-teal-700"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 placeholder-slate-400 font-medium focus:outline-none focus:border-teal-700"
                 />
               </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100/90 text-slate-800 font-bold uppercase tracking-wider border-b border-slate-200">
+                <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="p-3">Patient Name</th>
                     <th className="p-3">MediVault ID</th>
@@ -401,14 +578,11 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                       <td className="p-3">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-extrabold flex items-center justify-center text-xs">
-                            {(p.name || 'P')
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')}
+                            {getInitials(p.name)}
                           </div>
                           <div>
                             <strong className="text-slate-900 block font-bold">{p.name}</strong>
-                            <span className="text-[11px] text-slate-700 font-medium">
+                            <span className="text-[11px] text-slate-500 font-medium">
                               {p.age} yrs • {p.gender}
                             </span>
                           </div>
@@ -421,7 +595,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
 
                       <td className="p-3 text-slate-800">
                         <div className="font-semibold text-slate-900">{p.phone}</div>
-                        <div className="text-[11px] text-slate-600 font-medium">{p.email}</div>
+                        <div className="text-[11px] text-slate-500 font-medium">{p.email}</div>
                       </td>
 
                       <td className="p-3">
@@ -443,19 +617,32 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                       </td>
 
                       <td className="p-3 text-right">
-                        <button
-                          type="button"
-                          className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-slate-800 font-bold text-[11px] transition-colors"
-                        >
-                          View File
-                        </button>
+                        <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAptPatient(p);
+                              setActiveTab('appointment');
+                            }}
+                            className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg font-bold text-[11px] transition-colors"
+                          >
+                            Book Appt
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPatient(p)}
+                            className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-slate-800 font-bold text-[11px] transition-colors"
+                          >
+                            View File
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {filteredPatients.length === 0 && (
                     <tr>
                       <td colSpan="6" className="p-8 text-center text-slate-500">
-                        No matching patients found in MediVault directory.
+                        No matching patients found in {hospitalName} directory.
                       </td>
                     </tr>
                   )}
@@ -465,13 +652,404 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
           </div>
         )}
 
-        {/* TAB 2: REGISTER NEW PATIENT */}
+        {/* TAB 2: ADD PATIENT APPOINTMENT */}
+        {activeTab === 'appointment' && (
+          <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-teal-700" />
+                <span>Add Patient Appointment</span>
+              </h2>
+              <p className="text-xs text-slate-600 mt-1">
+                Schedule a consultation or check-in an existing patient with an authorized hospital physician.
+              </p>
+            </div>
+
+            {/* Step 1: Patient Selection / Confirmation */}
+            {!aptPatient ? (
+              <div className="space-y-4 p-5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Step 1: Select Patient from Hospital Directory or Global MediVault ID
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Directory Search */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Search Hospital Directory
+                    </label>
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search by name, phone or ID..."
+                        value={aptSearchQuery}
+                        onChange={(e) => setAptSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 font-medium focus:outline-none focus:border-teal-700"
+                      />
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto space-y-1 border border-slate-200 rounded-xl p-1 bg-white">
+                      {aptFilteredPatients.slice(0, 6).map((pat) => (
+                        <button
+                          key={pat.id || pat._id}
+                          type="button"
+                          onClick={() => setAptPatient(pat)}
+                          className="w-full text-left p-2 rounded-lg hover:bg-teal-50 transition-colors flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <span className="font-bold text-slate-900 block">{pat.name}</span>
+                            <span className="text-[10px] text-slate-500">{pat.mediVaultId} • {pat.phone}</span>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </button>
+                      ))}
+                      {aptFilteredPatients.length === 0 && (
+                        <div className="p-3 text-center text-slate-400 text-xs">No matching directory patient.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Exact MediVault ID Lookup */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Or Lookup Returning Global Patient by ID
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. MV-30003"
+                        value={exactLookupId}
+                        onChange={(e) => setExactLookupId(e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-teal-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleExactLookup}
+                        disabled={isLookingUp}
+                        className="px-3 py-2 bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all"
+                      >
+                        {isLookingUp ? '...' : 'Lookup'}
+                      </button>
+                    </div>
+
+                    {lookupResult && (
+                      <div className="p-3 rounded-xl bg-white border border-teal-200 text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900">{lookupResult.patient.name}</span>
+                          <span className="font-mono text-teal-800 text-[11px] font-bold">{lookupResult.patient.mediVaultId}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          {lookupResult.patient.age} yrs • {lookupResult.patient.gender} • {lookupResult.patient.bloodGroup}
+                        </p>
+                        {lookupResult.alreadyInDirectory ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAptPatient(lookupResult.patient);
+                              setLookupResult(null);
+                            }}
+                            className="w-full py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg font-bold text-xs"
+                          >
+                            Select Patient
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddExistingToDirectory(lookupResult.patient)}
+                            disabled={isAddingToDirectory}
+                            className="w-full py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg font-bold text-xs"
+                          >
+                            {isAddingToDirectory ? 'Adding...' : 'Add to Hospital & Select'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Verified Selected Patient Card */
+              <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-700 text-white font-extrabold flex items-center justify-center text-sm">
+                    {getInitials(aptPatient.name)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 text-sm">{aptPatient.name}</span>
+                      <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-teal-100 text-teal-800">
+                        {aptPatient.mediVaultId || aptPatient.id}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-600">
+                      {aptPatient.age ? `${aptPatient.age} yrs` : ''} • {aptPatient.gender || ''} • Blood Group: <strong>{aptPatient.bloodGroup || 'O+'}</strong> • Phone: {aptPatient.phone}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAptPatient(null)}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold"
+                >
+                  Change Patient
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Appointment Details Form */}
+            {aptPatient && (
+              <form onSubmit={handleCreateAppointmentSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Consulting Doctor */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Consulting Doctor *
+                    </label>
+                    <select
+                      required
+                      value={aptDoctorId || (doctors[0]?.id || doctors[0]?._id || '')}
+                      onChange={(e) => setAptDoctorId(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700"
+                    >
+                      {doctors.map((d) => (
+                        <option key={d.id || d._id} value={d.id || d._id}>
+                          {d.name} — {d.specialty || 'General'}
+                        </option>
+                      ))}
+                    </select>
+                    {doctors.length === 0 && (
+                      <span className="text-[11px] text-rose-600 block mt-1">
+                        No active doctors affiliated with {hospitalName}.
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Visit Type */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Visit Type
+                    </label>
+                    <select
+                      value={aptVisitType}
+                      onChange={(e) => setAptVisitType(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700"
+                    >
+                      <option value="New Consultation">New Consultation</option>
+                      <option value="Follow-up">Follow-up</option>
+                      <option value="Routine Checkup">Routine Checkup</option>
+                      <option value="Specialist Review">Specialist Review</option>
+                      <option value="Emergency">Emergency</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Appointment Date */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Appointment Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={aptDate}
+                      onChange={(e) => {
+                        setAptDate(e.target.value);
+                        if (e.target.value !== getTodayString()) {
+                          setAptCheckInNow(false);
+                        } else {
+                          setAptCheckInNow(true);
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700"
+                    />
+                  </div>
+
+                  {/* Appointment Time */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Appointment Time *
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={aptTime}
+                      onChange={(e) => setAptTime(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700"
+                    />
+                  </div>
+
+                  {/* Priority */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Priority
+                    </label>
+                    <select
+                      value={aptPriority}
+                      onChange={(e) => setAptPriority(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700"
+                    >
+                      <option value="Routine">Routine</option>
+                      <option value="Urgent">Urgent</option>
+                      <option value="Emergency">Emergency</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Reason for Visit */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Reason for Visit *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Hypertension review, persistent cough, regular annual checkup"
+                    value={aptReason}
+                    onChange={(e) => setAptReason(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:outline-none focus:border-teal-700"
+                  />
+                </div>
+
+                {/* Reported Symptoms */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Reported Symptoms (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Shortness of breath on exertion, headache in the morning"
+                    value={aptSymptoms}
+                    onChange={(e) => setAptSymptoms(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-medium focus:outline-none focus:border-teal-700"
+                  />
+                </div>
+
+                {/* Optional Preliminary Vitals Grid */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                    Optional Preliminary Vitals (At Desk)
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">BP</label>
+                      <input
+                        type="text"
+                        placeholder="120/80"
+                        value={aptBp}
+                        onChange={(e) => setAptBp(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Pulse</label>
+                      <input
+                        type="text"
+                        placeholder="72 bpm"
+                        value={aptPulse}
+                        onChange={(e) => setAptPulse(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Temp</label>
+                      <input
+                        type="text"
+                        placeholder="98.6 °F"
+                        value={aptTemp}
+                        onChange={(e) => setAptTemp(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">SpO2</label>
+                      <input
+                        type="text"
+                        placeholder="98%"
+                        value={aptSpO2}
+                        onChange={(e) => setAptSpO2(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Weight</label>
+                      <input
+                        type="text"
+                        placeholder="70 kg"
+                        value={aptWeight}
+                        onChange={(e) => setAptWeight(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Height</label>
+                      <input
+                        type="text"
+                        placeholder="172 cm"
+                        value={aptHeight}
+                        onChange={(e) => setAptHeight(e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Immediate check-in checkbox */}
+                <div className="flex items-center gap-2 p-3 bg-teal-50/50 rounded-xl border border-teal-200/80">
+                  <input
+                    type="checkbox"
+                    id="checkInNow"
+                    checked={aptCheckInNow}
+                    onChange={(e) => setAptCheckInNow(e.target.checked)}
+                    className="w-4 h-4 rounded text-teal-700 focus:ring-teal-500"
+                  />
+                  <label htmlFor="checkInNow" className="text-xs font-bold text-slate-800 cursor-pointer">
+                    Check-in immediately to doctor active queue (Issues live queue token)
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('list')}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreatingAppointment}
+                    className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-md shadow-teal-950/10 flex items-center gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>
+                      {isCreatingAppointment
+                        ? 'Creating...'
+                        : aptCheckInNow
+                        ? 'Check-In & Issue Token'
+                        : 'Schedule Appointment'}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: REGISTER NEW PATIENT IDENTITY (STRICTLY NO AUTO-APPOINTMENT) */}
         {activeTab === 'register' && (
           <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-8 space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Patient Identity Registration</h2>
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-teal-700" />
+                <span>Patient Identity Registration</span>
+              </h2>
               <p className="text-xs text-slate-600 mt-1">
-                Authorized frontdesk issuance of permanent MediVault ID and initial unclaimed verification slip.
+                Authorized frontdesk issuance of a permanent global MediVault ID and secure 7-day activation code.
+                Does not automatically book appointments or check-in.
               </p>
             </div>
 
@@ -583,47 +1161,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                 </div>
               </div>
 
-              {/* Assign Doctor Section */}
-              <div className="p-4 rounded-2xl bg-teal-50/50 border border-teal-200/80 space-y-3">
-                <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <Stethoscope className="w-4 h-4 text-teal-700" />
-                  <span>Immediate Check-In & Doctor Assignment</span>
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      Consulting Doctor
-                    </label>
-                    <select
-                      value={assignedDoctorId}
-                      onChange={(e) => setAssignedDoctorId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-teal-700 font-semibold"
-                    >
-                      {doctors.map((d) => (
-                        <option key={d.id || d._id} value={d.id || d._id}>
-                          {d.name} ({d.specialty})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      Reason for Visit
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Health Checkup, Fever, Consultation"
-                      value={visitReason}
-                      onChange={(e) => setVisitReason(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-teal-700 font-semibold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setActiveTab('list')}
@@ -644,7 +1182,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
           </div>
         )}
 
-        {/* TAB 2.5: EXACT MEDIVAULT ID LOOKUP */}
+        {/* TAB 4: EXACT MEDIVAULT ID LOOKUP */}
         {activeTab === 'lookup' && (
           <div className="max-w-2xl mx-auto bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-8 space-y-6">
             <div>
@@ -657,11 +1195,11 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
 
             <form onSubmit={handleExactLookup} className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   required
-                  placeholder="e.g. MV-2025-1001 or MV-2026-0001"
+                  placeholder="e.g. MV-10001, MV-20002, MV-30003"
                   value={exactLookupId}
                   onChange={(e) => setExactLookupId(e.target.value)}
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-teal-700"
@@ -682,10 +1220,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                 <div className="flex items-center justify-between pb-3 border-b border-teal-200/60">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-teal-700 text-white font-extrabold flex items-center justify-center text-sm">
-                      {(lookupResult.patient.name || 'P')
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
+                      {getInitials(lookupResult.patient.name)}
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900 text-sm">{lookupResult.patient.name}</h3>
@@ -707,23 +1242,35 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Contact Phone</span>
-                    <strong className="text-slate-800">{lookupResult.patient.phone || 'Protected'}</strong>
-                  </div>
-                  <div>
                     <span className="text-[10px] font-semibold text-slate-500 uppercase block">Demographics</span>
                     <strong className="text-slate-800">
                       {lookupResult.patient.age ? `${lookupResult.patient.age} yrs` : '—'} • {lookupResult.patient.gender || '—'}
                     </strong>
                   </div>
                   <div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Blood Group</span>
+                    <strong className="text-slate-800">{lookupResult.patient.bloodGroup || '—'}</strong>
+                  </div>
+                  <div>
                     <span className="text-[10px] font-semibold text-slate-500 uppercase block">Global Identity</span>
-                    <strong className="text-slate-800">Single Verified Account</strong>
+                    <strong className="text-slate-800">Single Permanent Record</strong>
                   </div>
                 </div>
 
-                {lookupResult.alreadyInDirectory ? (
-                  <div className="pt-2 flex justify-end">
+                <div className="pt-2 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAptPatient(lookupResult.patient);
+                      setActiveTab('appointment');
+                    }}
+                    className="bg-white hover:bg-slate-50 text-teal-700 border border-teal-200 font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Create Appointment</span>
+                  </button>
+
+                  {lookupResult.alreadyInDirectory ? (
                     <button
                       type="button"
                       onClick={() => handleSelectPatient(lookupResult.patient)}
@@ -732,44 +1279,31 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                       <UserCheck className="w-4 h-4" />
                       <span>Open Patient File</span>
                     </button>
-                  </div>
-                ) : (
-                  <div className="pt-2 space-y-3">
-                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
-                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                      <span>
-                        This patient belongs to the global MediVault network. Adding them to {currentHospital.name} will create a local hospital directory link without duplicating their permanent medical identity.
-                      </span>
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={handleAddExistingToDirectory}
-                        disabled={isAddingToDirectory}
-                        className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        <span>{isAddingToDirectory ? 'Adding to Directory...' : 'Add Patient to Hospital Directory'}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleAddExistingToDirectory()}
+                      disabled={isAddingToDirectory}
+                      className="bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white font-bold text-xs px-5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>{isAddingToDirectory ? 'Adding...' : 'Add to Hospital Directory'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* TAB 3: PATIENT DETAIL & TRIAGE VITALS */}
+        {/* TAB 5: PATIENT DETAIL & ENCOUNTERS */}
         {activeTab === 'patient-detail' && selectedPatient && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white font-black text-lg flex items-center justify-center">
-                    {(selectedPatient.name || 'P')
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')}
+                    {getInitials(selectedPatient.name)}
                   </div>
                   <div>
                     <h2 className="text-xl font-extrabold text-slate-900">{selectedPatient.name}</h2>
@@ -780,7 +1314,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center flex-wrap gap-2">
                   <button
                     onClick={() => setActiveTab('list')}
                     className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5 border border-slate-200"
@@ -788,9 +1322,21 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Back to Directory</span>
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setAptPatient(selectedPatient);
+                      setActiveTab('appointment');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Book Appointment</span>
+                  </button>
+
                   <button
                     onClick={() => setIsEditing(!isEditing)}
-                    className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <Edit className="w-3.5 h-3.5" />
                     <span>{isEditing ? 'Cancel Edit' : 'Edit Triage Vitals'}</span>
@@ -812,14 +1358,14 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                     Blood Group: <strong>{selectedPatient.bloodGroup || 'O+'}</strong>
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Allergies: {selectedPatient.allergies?.[0]?.allergen || 'None recorded'}
+                    Allergies: {selectedPatient.allergies?.[0]?.allergen || (typeof selectedPatient.allergies?.[0] === 'string' ? selectedPatient.allergies[0] : 'None recorded')}
                   </div>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
                   <span className="text-[10px] font-bold text-slate-500 uppercase">Current Vitals</span>
                   <div className="text-xs font-semibold text-slate-900">
-                    BP: {selectedPatient.vitals?.bp || editBp} | Pulse: {selectedPatient.vitals?.heartRate || editPulse}
+                    BP: {selectedPatient.vitals?.bp || editBp} | Pulse: {selectedPatient.vitals?.heartRate || selectedPatient.vitals?.pulse || editPulse}
                   </div>
                   <div className="text-[11px] text-slate-500">
                     Account: {selectedPatient.isClaimed ? 'Activated Patient Account' : 'Unclaimed Account'}
@@ -902,7 +1448,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                     <Plus className="w-4 h-4 text-teal-700" />
-                    <span>Create New Encounter / Check-In</span>
+                    <span>Quick Immediate Check-In & Issue Token</span>
                   </span>
                   <span className="text-[11px] font-semibold text-teal-800">
                     {selectedDoctorIds.length} Doctor(s) Selected
@@ -938,7 +1484,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                 {/* Multi-Doctor Selection */}
                 <div>
                   <label className="text-[11px] font-bold text-slate-700 block mb-1.5">
-                    Select Attending Doctor(s)
+                    Select Attending Doctor(s) at {hospitalName}
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                     {doctors.map((doc) => {
@@ -1007,7 +1553,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                   if (patientVisits.length === 0) {
                     return (
                       <div className="p-6 text-center text-slate-500 text-xs border border-dashed border-slate-200 rounded-2xl">
-                        No hospital encounters recorded yet for this patient at {currentHospital.name}.
+                        No hospital encounters recorded yet for this patient at {hospitalName}.
                       </div>
                     );
                   }
@@ -1017,7 +1563,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                       {patientVisits.map((visit) => {
                         const visitId = visit.id || visit._id;
                         const assignedDocs = visit.assignedDoctors || (visit.doctorId ? [doctors.find(d => (d.id || d._id) === visit.doctorId) || { name: 'Assigned Doctor', id: visit.doctorId }] : []);
-                        
+
                         return (
                           <div key={visitId} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1025,14 +1571,14 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                                 <span className="px-2.5 py-1 rounded-lg bg-teal-700 text-white font-mono font-bold text-xs">
                                   Token {visit.tokenNumber || '—'}
                                 </span>
-                                <span className="text-xs font-bold text-slate-900">{visit.reason}</span>
+                                <span className="text-xs font-bold text-slate-900">{visit.reasonForVisit || visit.reason || 'General'}</span>
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
                                   {visit.priority || 'Routine'}
                                 </span>
                               </div>
                               <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5" />
-                                <span>{visit.checkInTime || 'Today'} • Status: <strong>{visit.status || 'Waiting'}</strong></span>
+                                <span>{visit.appointmentTime || visit.checkInTime || 'Today'} • Status: <strong>{visit.status || 'Waiting'}</strong></span>
                               </span>
                             </div>
 
@@ -1041,7 +1587,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                                 Assigned Attending Doctors ({assignedDocs.length})
                               </span>
-                              
+
                               <div className="flex flex-wrap gap-2 items-center">
                                 {assignedDocs.map((docItem, idx) => {
                                   const docObj = docItem.doctor || docItem;
@@ -1111,7 +1657,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
         )}
       </div>
 
-      {/* REGISTRATION CONFIRMATION SLIP MODAL */}
+      {/* REGISTRATION CONFIRMATION SLIP MODAL (STRICTLY NO AUTO-APPOINTMENT) */}
       {registrationSlip && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl p-6 space-y-5 animate-in fade-in">
@@ -1120,7 +1666,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                 <div className="w-7 h-7 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center">
                   <CheckCircle2 className="w-4 h-4 text-teal-700" />
                 </div>
-                <span className="font-bold text-slate-900 text-sm">Patient Registration Slip</span>
+                <span className="font-bold text-slate-900 text-sm">Patient Account Verification Slip</span>
               </div>
               <button
                 onClick={() => setRegistrationSlip(null)}
@@ -1133,7 +1679,7 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
             <div className="bg-slate-50 border border-dashed border-teal-600/40 rounded-2xl p-5 space-y-3 font-mono">
               <div className="text-center pb-2 border-b border-slate-200">
                 <h3 className="font-bold text-slate-900 text-base">{registrationSlip.name}</h3>
-                <span className="text-[11px] text-slate-500">MediVault Health Identity</span>
+                <span className="text-[11px] text-slate-500">Global Permanent MediVault Identity</span>
               </div>
 
               <div className="space-y-1.5 text-xs">
@@ -1148,17 +1694,17 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
                   </strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Assigned Doctor:</span>
-                  <span className="text-slate-900 font-semibold">{registrationSlip.doctorName}</span>
+                  <span className="text-slate-500">Phone:</span>
+                  <span className="text-slate-900 font-semibold">{registrationSlip.phone}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Queue Token:</span>
-                  <strong className="text-slate-900">{registrationSlip.tokenNumber}</strong>
+                  <span className="text-slate-500">Blood Group:</span>
+                  <strong className="text-slate-900">{registrationSlip.bloodGroup || 'O+'}</strong>
                 </div>
               </div>
 
               <p className="text-[10px] text-slate-500 pt-2 border-t border-slate-200 leading-relaxed font-sans">
-                Please hand this slip to the patient. They can securely activate their account at <strong>medivault.io</strong> using their <strong>MediVault ID</strong> and <strong>Activation Code</strong> (valid for 7 days).
+                Hand this activation slip to the patient. They can securely claim and activate their account at <strong>medivault.io</strong> using their <strong>MediVault ID</strong> and <strong>Activation Code</strong> (valid for 7 days).
               </p>
             </div>
 
@@ -1174,10 +1720,23 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
               <button
                 type="button"
                 onClick={() => {
+                  if (registrationSlip.createdPatient) {
+                    setAptPatient(registrationSlip.createdPatient);
+                  }
+                  setRegistrationSlip(null);
+                  setActiveTab('appointment');
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold"
+              >
+                Schedule Appointment
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setRegistrationSlip(null);
                   setActiveTab('list');
                 }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold"
+                className="py-2.5 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold"
               >
                 Done
               </button>

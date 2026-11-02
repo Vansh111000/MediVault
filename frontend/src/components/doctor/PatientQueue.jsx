@@ -131,7 +131,7 @@ export default function PatientQueue({ patients, onRefresh }) {
                                 : avatarTones[index % avatarTones.length];
 
                             return (
-                                <tr key={patient._id || patient.id || index} className="hover:bg-slate-50/70 transition-colors">
+                                <tr key={patient.visitId || patient._id || patient.id || index} className="hover:bg-slate-50/70 transition-colors">
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-9 h-9 rounded-full font-bold flex items-center justify-center text-xs shrink-0 ${avatar}`}>
@@ -173,6 +173,11 @@ export default function PatientQueue({ patients, onRefresh }) {
                                         <span className={`px-2 py-0.5 rounded-md text-[11px] ${visitTypeTones[toDisplayVisitType(patient.visitType)] || "bg-slate-100 text-slate-600"}`}>
                                             {toDisplayVisitType(patient.visitType)}
                                         </span>
+                                        {patient.reasonForVisit && (
+                                            <span className="block text-[10px] text-slate-500 font-medium truncate max-w-[150px]" title={patient.reasonForVisit}>
+                                                {patient.reasonForVisit}
+                                            </span>
+                                        )}
                                     </td>
 
                                     <td className="py-3 px-3">
@@ -180,7 +185,7 @@ export default function PatientQueue({ patients, onRefresh }) {
                                     </td>
 
                                     <td className="py-3 px-4 text-right">
-                                        {toDisplayStatus(patient.status) !== "upcoming" && (patient._id || patient.id) && (
+                                        {(patient._id || patient.id) && (
                                             <Link
                                                 to={patient.visitId ? `/doctor/patients/${patient._id || patient.id}?visitId=${patient.visitId}` : `/doctor/patients/${patient._id || patient.id}`}
                                                 className={`inline-block whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${

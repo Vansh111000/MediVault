@@ -169,11 +169,47 @@ function WorkspaceBody({ patient, visitId, initialConsultation }) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-100">
                     <InfoRow icon="assignment" label="Visit type" value={toDisplayVisitType(patient.visitType)} />
-                    <InfoRow icon="schedule" label="Appointment time" value={patient.time || "--"} />
+                    <InfoRow icon="schedule" label="Appointment time" value={patient.appointmentDate ? `${patient.appointmentDate} • ${patient.time}` : patient.time || "--"} />
+                    <InfoRow icon="medical_services" label="Reason for visit" value={patient.reasonForVisit || "General Consultation"} />
                     <InfoRow icon="folder_shared" label="Records" value={getRecordAvailability(patient)} />
                 </div>
+
+                {(patient.reportedSymptoms || (patient.preliminaryVitals && Object.keys(patient.preliminaryVitals).length > 0)) && (
+                    <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-4 text-xs text-slate-700">
+                        {patient.reportedSymptoms && (
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-900">Symptoms:</span>
+                                <span>{patient.reportedSymptoms}</span>
+                            </div>
+                        )}
+                        {patient.preliminaryVitals?.bp && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-slate-500 font-medium">BP:</span>
+                                <span className="font-semibold text-slate-900">{patient.preliminaryVitals.bp}</span>
+                            </div>
+                        )}
+                        {patient.preliminaryVitals?.pulse && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-slate-500 font-medium">Pulse:</span>
+                                <span className="font-semibold text-slate-900">{patient.preliminaryVitals.pulse}</span>
+                            </div>
+                        )}
+                        {patient.preliminaryVitals?.spO2 && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-slate-500 font-medium">SpO2:</span>
+                                <span className="font-semibold text-slate-900">{patient.preliminaryVitals.spO2}</span>
+                            </div>
+                        )}
+                        {patient.preliminaryVitals?.temp && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-slate-500 font-medium">Temp:</span>
+                                <span className="font-semibold text-slate-900">{patient.preliminaryVitals.temp}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Tab navigation and content */}
@@ -287,6 +323,11 @@ export default function PatientWorkspace() {
                     }
                 } catch (_) {}
 
+                const appointmentDateStr = resolvedVisit?.appointmentDate
+                    ? new Date(resolvedVisit.appointmentDate).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' })
+                    : "";
+                const appointmentTimeStr = resolvedVisit?.appointmentTime || time;
+
                 if (isMounted) {
                     setActiveVisitId(visitId);
                     setInitialConsult(resolvedConsultations[0] || null);
@@ -302,10 +343,19 @@ export default function PatientWorkspace() {
                         email: resolvedPatient.email,
                         allergies: resolvedPatient.allergies || [],
                         chronicConditions: resolvedPatient.chronicConditions || [],
-                        vitals: resolvedPatient.vitals || {},
+                        vitals: resolvedVisit?.preliminaryVitals && Object.keys(resolvedVisit.preliminaryVitals).length > 0
+                            ? { ...resolvedPatient.vitals, ...resolvedVisit.preliminaryVitals }
+                            : (resolvedPatient.vitals || {}),
                         status,
-                        time,
-                        visitType: "new",
+                        rawStatus: resolvedVisit?.status || "checked_in",
+                        time: appointmentTimeStr,
+                        appointmentDate: appointmentDateStr,
+                        appointmentTime: appointmentTimeStr,
+                        visitType: resolvedVisit?.visitType || "New Consultation",
+                        reasonForVisit: resolvedVisit?.reasonForVisit || "General Consultation",
+                        reportedSymptoms: resolvedVisit?.reportedSymptoms || "",
+                        preliminaryVitals: resolvedVisit?.preliminaryVitals || {},
+                        tokenNumber: resolvedVisit?.tokenNumber || "",
                         consent: consentInfo,
                     });
                 }

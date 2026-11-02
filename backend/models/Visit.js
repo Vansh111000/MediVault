@@ -15,8 +15,22 @@ const visitSchema = new mongoose.Schema({
   },
   checkInTime: {
     type: Date,
+    index: true
+  },
+  appointmentDate: {
+    type: Date,
     default: Date.now,
     index: true
+  },
+  appointmentTime: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  visitType: {
+    type: String,
+    default: 'New Consultation',
+    trim: true
   },
   dischargeTime: {
     type: Date
@@ -54,7 +68,7 @@ const visitSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['checked_in', 'in_queue', 'in_consultation', 'completed', 'cancelled'],
+    enum: ['scheduled', 'checked_in', 'in_queue', 'in_consultation', 'completed', 'cancelled'],
     default: 'checked_in',
     index: true
   },

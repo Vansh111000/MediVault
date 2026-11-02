@@ -4,33 +4,34 @@ const { successResponse, errorResponse } = require('../utils/apiResponse');
 /**
  * List doctors eligible to be assigned by the authenticated assistant.
  * SECURITY: When called by an assistant, returns ONLY doctors from their active hospital.
- * Never returns doctors from other hospitals.
+ * Never returns doctors from other hospitals or all doctors without hospital context.
  */
 const getDoctors = async (req, res, next) => {
   try {
     const { specialty } = req.query;
 
+    if (!req.user) {
+      return errorResponse(res, 401, 'Authentication required to view doctors.');
+    }
+
     // Derive hospital from authenticated user membership only
     const hospitalId = req.activeHospital ? req.activeHospital._id : null;
 
-    let doctorIds = null;
-
-    if (hospitalId) {
-      // Find all active doctor memberships at THIS hospital
-      const memberships = await HospitalMembership.find({
-        hospital: hospitalId,
-        role: 'doctor',
-        status: 'active'
-      });
-      const userIds = memberships.map(m => m.user);
-      const docs = await Doctor.find({ user: { $in: userIds }, status: 'active' });
-      doctorIds = docs.map(d => d._id);
+    if (!hospitalId) {
+      return errorResponse(res, 400, 'Hospital context could not be established.');
     }
 
-    const query = { status: 'active' };
-    if (doctorIds !== null) {
-      query._id = { $in: doctorIds };
-    }
+    // Find all active doctor memberships at THIS hospital
+    const memberships = await HospitalMembership.find({
+      hospital: hospitalId,
+      role: 'doctor',
+      status: 'active'
+    });
+    const userIds = memberships.map(m => m.user);
+    const docs = await Doctor.find({ user: { $in: userIds }, status: 'active' });
+    const doctorIds = docs.map(d => d._id);
+
+    const query = { status: 'active', _id: { $in: doctorIds } };
     if (specialty) {
       query.specialty = { $regex: specialty, $options: 'i' };
     }
@@ -64,23 +65,36 @@ const getDoctorDashboard = async (req, res, next) => {
     const hospitalId = req.activeHospital ? req.activeHospital._id : null;
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-    // Query visits assigned specifically to THIS doctor
+    // Active queue: visits assigned to THIS doctor that are checked in, waiting in queue, or in consultation
+    // Today's appointments/visits: scheduled for today or checked in today
     const visitQuery = {
       assignedDoctors: doctor._id,
-      checkInTime: { $gte: todayStart }
+      $or: [
+        { status: { $in: ['in_queue', 'checked_in', 'in_consultation'] } },
+        { appointmentDate: { $gte: todayStart, $lte: todayEnd } },
+        { checkInTime: { $gte: todayStart, $lte: todayEnd } }
+      ]
     };
     if (hospitalId) {
       visitQuery.hospital = hospitalId;
     }
 
     const todayVisits = await Visit.find(visitQuery)
-      .populate('patient', 'name mediVaultId age gender vitals bloodGroup phone')
+      .populate('patient', 'name mediVaultId age gender vitals bloodGroup phone allergies')
       .populate('hospital', 'name hospitalCode')
-      .sort({ checkInTime: 1 });
+      .populate('assignedDoctors', 'name specialty')
+      .sort({ appointmentDate: 1, checkInTime: 1 });
 
-    const totalToday = todayVisits.length;
+    const totalToday = todayVisits.filter(v =>
+      (v.appointmentDate >= todayStart && v.appointmentDate <= todayEnd) ||
+      (v.checkInTime >= todayStart && v.checkInTime <= todayEnd) ||
+      ['in_queue', 'checked_in', 'in_consultation'].includes(v.status)
+    ).length;
     const completed = todayVisits.filter(v => v.status === 'completed').length;
+    // Active queue: only visits currently waiting or in consultation
     const upcoming = todayVisits.filter(v => ['in_queue', 'checked_in', 'in_consultation'].includes(v.status)).length;
 
     // Pending drafts for THIS doctor only
