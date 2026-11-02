@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import Icon from "../../../components/Icon";
-import AISummaryCard from "./AISummaryCard";
 import { useApp } from "../../../context/AppContext";
 import api from "../../../services/api";
 
@@ -313,8 +312,6 @@ export default function ConsultationTab() {
                     {badge.label}
                 </span>
             </div>
-
-            <AISummaryCard patient={patient} allergyLabel={allergyLabel} />
 
             {completed ? (
                 <CompletedPanel

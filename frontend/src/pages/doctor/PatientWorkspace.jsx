@@ -35,9 +35,18 @@ function getAllergyLabel(patient) {
 
 function getBodyMeasurements(patient) {
     const vitals = patient?.vitals || {};
+    const formatMeasurement = (val, unit) => {
+        if (!val) return "--";
+        const str = String(val).trim();
+        const regex = new RegExp(`\\s*${unit}$`, 'i');
+        if (regex.test(str)) {
+            return str;
+        }
+        return `${str} ${unit}`;
+    };
     return {
-        height: vitals.height ? `${vitals.height} cm` : "--",
-        weight: vitals.weight ? `${vitals.weight} kg` : "--",
+        height: formatMeasurement(vitals.height, "cm"),
+        weight: formatMeasurement(vitals.weight, "kg"),
     };
 }
 
