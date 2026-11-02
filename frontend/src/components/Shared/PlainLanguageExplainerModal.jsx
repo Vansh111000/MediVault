@@ -1,8 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Sparkles, BookOpen, AlertTriangle, Building2, Pill, Activity } from 'lucide-react';
 import { SummaryPointsList } from '../../utils/summaryFormatter';
+import api from '../../services/api';
 
 export const PlainLanguageExplainerModal = ({ isOpen, onClose, record }) => {
+  const [explanation, setExplanation] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [retryAttempt, setRetryAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen || !record) return undefined;
+    let current = true;
+    setExplanation('');
+    setError('');
+    setLoading(true);
+    api.explainPatientRecord(record.id || record._id)
+      .then((response) => {
+        if (current) setExplanation(response?.data?.text || 'No explanation was returned.');
+      })
+      .catch((requestError) => {
+        if (current) setError(requestError.message || 'Unable to explain this record right now.');
+      })
+      .finally(() => {
+        if (current) setLoading(false);
+      });
+    return () => { current = false; };
+  }, [isOpen, record?.id, record?._id, retryAttempt]);
+
   if (!isOpen || !record) return null;
 
   return (
@@ -18,7 +43,7 @@ export const PlainLanguageExplainerModal = ({ isOpen, onClose, record }) => {
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-slate-900">Plain-Language Medical Report</h3>
                 <span className="px-2 py-0.5 text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200 rounded-md">
-                  AI Translation
+                  Gemini AI
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -54,7 +79,18 @@ export const PlainLanguageExplainerModal = ({ isOpen, onClose, record }) => {
               <BookOpen className="w-4 h-4 text-teal-700" />
               <span>What this report means in simple terms:</span>
             </div>
-            <SummaryPointsList text={record.plainLanguageExplanation || record.summary} />
+            {loading ? (
+              <p className="text-sm text-slate-600">Gemini is preparing a concise explanation from this completed consultation...</p>
+            ) : error ? (
+              <div role="alert" className="space-y-2">
+                <p className="text-sm text-rose-700">{error}</p>
+                <button type="button" onClick={() => setRetryAttempt((attempt) => attempt + 1)} className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50">
+                  Try again
+                </button>
+              </div>
+            ) : (
+              <SummaryPointsList text={explanation} />
+            )}
           </div>
 
           {/* Test markers breakdown if test results exist */}

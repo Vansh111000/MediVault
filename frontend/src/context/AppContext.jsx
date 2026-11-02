@@ -14,6 +14,32 @@ import {
   INITIAL_NOTIFICATIONS
 } from '../data/mockData';
 
+const mapConsultationsToRecords = (consultations = [], patientId) => consultations
+  .filter((consultation) => consultation.status === 'completed')
+  .map((consultation) => ({
+    id: consultation._id || consultation.id,
+    patientId: String(consultation.patient?._id || consultation.patient?.id || consultation.patient || patientId || ''),
+    hospitalId: consultation.hospital?._id || consultation.hospital?.id || consultation.hospital,
+    hospitalName: consultation.hospital?.name || 'Hospital not recorded',
+    doctorId: consultation.doctor?._id || consultation.doctor?.id || consultation.doctor,
+    doctorName: consultation.doctor?.name || 'Doctor not recorded',
+    specialty: consultation.doctor?.specialty || 'General',
+    category: consultation.prescriptions?.length ? 'Prescription' : 'Consultation',
+    recordType: 'Clinical Consultation',
+    title: `Consultation at ${consultation.hospital?.name || 'Hospital'}`,
+    date: new Date(consultation.completedAt || consultation.createdAt || consultation.updatedAt).toLocaleDateString(),
+    summary: consultation.clinicalNote || 'No consultation note was recorded.',
+    clinicalNote: consultation.clinicalNote || '',
+    medications: (consultation.prescriptions || []).map((prescription) => ({
+      drug: prescription.name,
+      dosage: prescription.dosage,
+      frequency: prescription.frequency,
+      duration: prescription.duration,
+      instructions: prescription.instructions
+    })),
+    isImmutable: true
+  }));
+
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
@@ -118,9 +144,11 @@ export const AppProvider = ({ children }) => {
   });
 
   // Fetch Atlas Data on App Init
-  const loadBackendData = useCallback(async (forcedHospId = null) => {
+  const loadBackendData = useCallback(async (forcedHospId = null, roleOverride = null) => {
     try {
       const effectiveHospId = forcedHospId || api.activeHospitalId || activeHospitalId;
+      const loadRole = roleOverride || currentRole;
+      const canLoadHospitalLists = ['doctor', 'assistant', 'receptionist'].includes(loadRole) && Boolean(effectiveHospId);
       // 1. Fetch hospitals
       const hospRes = await api.getHospitals().catch(() => null);
       if (hospRes?.data && hospRes.data.length > 0) {
@@ -143,23 +171,27 @@ export const AppProvider = ({ children }) => {
       }
 
       // 2. Fetch doctors scoped to authenticated hospital (backend enforces scoping)
-      const docRes = await api.getDoctors().catch(() => null);
-      if (docRes?.data && Array.isArray(docRes.data)) {
-        const mappedDoctors = docRes.data.map(d => ({
-          id: d._id,
-          _id: d._id,
-          name: d.name,
-          specialty: d.specialty,
-          licenseNumber: d.licenseNumber,
-          email: d.email || d.user?.email,
-        }));
-        setDoctors(mappedDoctors);
+      if (api.token && canLoadHospitalLists) {
+        const docRes = await api.getDoctors().catch(() => null);
+        if (docRes?.data && Array.isArray(docRes.data)) {
+          const mappedDoctors = docRes.data.map(d => ({
+            id: d._id,
+            _id: d._id,
+            name: d.name,
+            specialty: d.specialty,
+            licenseNumber: d.licenseNumber,
+            email: d.email || d.user?.email,
+          }));
+          setDoctors(mappedDoctors);
+        } else {
+          setDoctors([]);
+        }
       } else {
         setDoctors([]);
       }
 
       // 3. Fetch patients: prioritize hospital-specific directory for staff
-      if (api.token) {
+      if (api.token && canLoadHospitalLists) {
         const hospPatRes = await api.getHospitalPatients().catch(() => null);
         if (hospPatRes?.data && Array.isArray(hospPatRes.data)) {
           const mappedFromDir = hospPatRes.data
@@ -191,7 +223,7 @@ export const AppProvider = ({ children }) => {
         } else {
           setPatients([]);
         }
-      } else {
+      } else if (!api.token) {
         setPatients([]);
       }
 
@@ -231,12 +263,14 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.warn('Initial Atlas data load fallback:', err.message);
     }
-  }, [activeHospitalId]);
+  }, [activeHospitalId, currentRole]);
 
   // Initial Auth Check
   useEffect(() => {
     const initAuth = async () => {
       setAuthLoading(true);
+      let resolvedHospId = null;
+      let resolvedRole = currentRole;
       if (api.token) {
         try {
           const res = await api.getMe();
@@ -244,11 +278,12 @@ export const AppProvider = ({ children }) => {
             const u = res.data.user;
             setCurrentUser(u);
             const mappedRole = u.role === 'receptionist' ? 'assistant' : u.role;
+            resolvedRole = mappedRole;
             setCurrentRole(mappedRole);
             setIsAuthenticated(true);
 
             let hosp = res.data.activeHospital || res.data.memberships?.[0]?.hospital || null;
-            let resolvedHospId = null;
+            // resolvedHospId assigned below
             if (hosp) {
               resolvedHospId = hosp._id || hosp.id || hosp;
               setActiveHospitalId(resolvedHospId);
@@ -267,7 +302,7 @@ export const AppProvider = ({ children }) => {
                 });
                 try {
                   api.getPatientMedicalHistory(patId).then(hist => {
-                    if (hist?.data?.records) setRecords(hist.data.records);
+                    if (hist?.data?.consultations) setRecords(mapConsultationsToRecords(hist.data.consultations, patId));
                   }).catch(() => {});
                 } catch (_) {}
               }
@@ -297,7 +332,7 @@ export const AppProvider = ({ children }) => {
           api.logout();
         }
       }
-      await loadBackendData(resolvedHospId);
+      await loadBackendData(resolvedHospId, resolvedRole);
       setAuthLoading(false);
     };
 
@@ -356,7 +391,7 @@ export const AppProvider = ({ children }) => {
             });
             try {
               api.getPatientMedicalHistory(patId).then(hist => {
-                if (hist?.data?.records) setRecords(hist.data.records);
+                if (hist?.data?.consultations) setRecords(mapConsultationsToRecords(hist.data.consultations, patId));
               }).catch(() => {});
             } catch (_) {}
           }
@@ -383,7 +418,7 @@ export const AppProvider = ({ children }) => {
           } catch (_) {}
         }
 
-        await loadBackendData(hospId);
+        await loadBackendData(hospId, mappedRole);
         showToast('Signed In', `Welcome back, ${u.email}!`, 'success');
         return { success: true, role: u.role };
       }

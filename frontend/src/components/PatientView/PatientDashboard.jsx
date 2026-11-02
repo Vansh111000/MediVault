@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import api from '../../services/api';
 import { PlainLanguageExplainerModal } from '../Shared/PlainLanguageExplainerModal';
 import { Footer } from '../Shared/Footer';
 import { SummaryPointsList } from '../../utils/summaryFormatter';
@@ -23,10 +24,13 @@ import {
 } from 'lucide-react';
 
 export const PatientDashboard = ({ onLogout, onNavigateHome }) => {
-  const { currentPatient, records, consentRequests, revokeConsent, respondConsentRequest, showToast } = useApp();
+  const { currentPatient, records, activeVisits, consentRequests, revokeConsent, respondConsentRequest, showToast } = useApp();
   const [activeTab, setActiveTab] = useState('records'); // 'records', 'prescriptions', 'consents'
   const [selectedRecordForExplain, setSelectedRecordForExplain] = useState(null);
   const [selectedRecordDetail, setSelectedRecordDetail] = useState(null);
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState('');
 
   // Filter only records that belong strictly to this patient (no loose fallbacks)
   const patientRecords = records.filter(
@@ -62,8 +66,14 @@ export const PatientDashboard = ({ onLogout, onNavigateHome }) => {
     const cPatId = String(c.patientId?._id || c.patientId?.id || c.patientId || '');
     const curId = String(currentPatient?.id || currentPatient?._id || '');
     const curMvId = String(currentPatient?.mediVaultId || '');
-    return !cPatId || cPatId === curId || (curMvId && cPatId === curMvId);
+    return Boolean(cPatId) && (cPatId === curId || (curMvId && cPatId === curMvId));
   });
+
+  const patientAppointments = (activeVisits || []).filter((visit) => {
+    const visitPatientId = String(visit.patientId?._id || visit.patientId?.id || visit.patientId || '');
+    const patientId = String(currentPatient?.id || currentPatient?._id || '');
+    return visitPatientId && patientId && visitPatientId === patientId;
+  }).sort((a, b) => new Date(b.appointmentDate || b.checkInTime || 0) - new Date(a.appointmentDate || a.checkInTime || 0));
 
   const handleRevokeConsent = async (id) => {
     try {
@@ -78,6 +88,19 @@ export const PatientDashboard = ({ onLogout, onNavigateHome }) => {
       if (respondConsentRequest) await respondConsentRequest(id, approved);
     } catch (e) {
       showToast('Error', e.message || 'Failed to respond to consent request', 'error');
+    }
+  };
+
+  const handleGenerateAiSummary = async () => {
+    setAiSummaryLoading(true);
+    setAiSummaryError('');
+    try {
+      const response = await api.generatePatientAiSummary();
+      setAiSummary(response?.data?.text || 'No summary was returned. Please try again.');
+    } catch (error) {
+      setAiSummaryError(error.message || 'Unable to generate your summary right now.');
+    } finally {
+      setAiSummaryLoading(false);
     }
   };
 
@@ -324,6 +347,27 @@ export const PatientDashboard = ({ onLogout, onNavigateHome }) => {
                 <p className="text-xs text-slate-700 font-medium">Complete historical health timeline recorded and verified by consulting doctors.</p>
               </div>
 
+              <section className="rounded-2xl border border-teal-200 bg-teal-50/50 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2"><Sparkles className="h-4 w-4 text-teal-700" />AI summary of your past records</h3>
+                    <p className="mt-1 text-xs text-slate-600">Gemini creates a short summary from your completed consultations. Your record text is sent to Google Gemini when you request a summary.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiSummary}
+                    disabled={aiSummaryLoading || patientRecords.length === 0}
+                    className="shrink-0 rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {aiSummaryLoading ? 'Summarizing...' : aiSummary ? 'Refresh summary' : 'Summarize my records'}
+                  </button>
+                </div>
+                {aiSummaryError && <p role="alert" className="text-xs font-medium text-rose-700">{aiSummaryError}</p>}
+                {aiSummary && <div className="rounded-xl border border-teal-100 bg-white p-3 text-sm text-slate-800"><SummaryPointsList text={aiSummary} /></div>}
+                {patientRecords.length === 0 && <p className="text-xs text-slate-500">A summary will be available after completed consultations are added to your chart.</p>}
+                <p className="text-[11px] text-slate-500">Informational only; AI summaries can be incomplete or inaccurate. Ask your clinician about medical decisions.</p>
+              </section>
+
               {patientRecords.length === 0 ? (
                 <div className="p-8 text-center text-xs text-slate-600 font-medium">
                   No medical records found for this profile.
@@ -451,7 +495,36 @@ export const PatientDashboard = ({ onLogout, onNavigateHome }) => {
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-4">
             <div>
               <h2 className="text-base font-bold text-slate-900">Hospital Access & Privacy Permissions</h2>
-              <p className="text-xs text-slate-500">Control which doctors and healthcare facilities can view your medical records.</p>
+              <p className="text-xs text-slate-500">Review your appointments and control which hospitals and care teams can view your medical records.</p>
+              <section className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-slate-900">Appointments and hospital care</h3>
+                  <span className="text-xs font-semibold text-slate-600">{patientAppointments.length} appointment{patientAppointments.length === 1 ? '' : 's'}</span>
+                </div>
+                {patientAppointments.length === 0 ? (
+                  <p className="py-3 text-center text-xs text-slate-500">No appointments or hospital visits are linked to your profile yet.</p>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {patientAppointments.map((visit) => {
+                      const status = visit.status || visit.rawStatus || 'Scheduled';
+                      const dateValue = visit.appointmentDate || visit.checkInTime;
+                      const dateText = dateValue ? new Date(dateValue).toLocaleDateString() : 'Date not set';
+                      const doctors = visit.assignedDoctors?.length ? visit.assignedDoctors.map((doctor) => doctor.name || doctor).join(', ') : (visit.assignedDoctorName && visit.assignedDoctorName !== 'Attending Physician' ? visit.assignedDoctorName : 'Doctor not assigned yet');
+                      return (
+                        <article key={visit.id || visit._id} className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 font-bold text-slate-900"><Building2 className="h-4 w-4 text-teal-700" />{visit.hospitalName || visit.hospital?.name || 'Hospital'}</div>
+                            <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-800">{status}</span>
+                          </div>
+                          <div className="text-xs text-slate-600"><span className="font-semibold">Doctor:</span> {doctors}</div>
+                          <div className="text-xs text-slate-600"><span className="font-semibold">Appointment:</span> {dateText}{visit.appointmentTime ? ` at ${visit.appointmentTime}` : ''}</div>
+                          {visit.reasonForVisit && <div className="text-xs text-slate-600"><span className="font-semibold">Reason:</span> {visit.reasonForVisit}</div>}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
             </div>
 
             {patientConsents.length === 0 ? (

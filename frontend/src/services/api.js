@@ -9,6 +9,8 @@ class ApiService {
   constructor() {
     this.token = localStorage.getItem('medivault_token') || null;
     this.activeHospitalId = localStorage.getItem('medivault_hospital_id') || null;
+    this.pendingPatientSummary = null;
+    this.pendingRecordExplanations = new Map();
   }
 
   setToken(token) {
@@ -155,6 +157,23 @@ class ApiService {
 
   async getPatientMedicalHistory(patientId) {
     return this.request(`/patients/${patientId}/history`);
+  }
+
+  async generatePatientAiSummary() {
+    if (!this.pendingPatientSummary) {
+      this.pendingPatientSummary = this.request('/ai/patient/summary', { method: 'POST', body: {} })
+        .finally(() => { this.pendingPatientSummary = null; });
+    }
+    return this.pendingPatientSummary;
+  }
+
+  async explainPatientRecord(recordId) {
+    if (!this.pendingRecordExplanations.has(recordId)) {
+      const request = this.request('/ai/patient/explain-record', { method: 'POST', body: { recordId } })
+        .finally(() => this.pendingRecordExplanations.delete(recordId));
+      this.pendingRecordExplanations.set(recordId, request);
+    }
+    return this.pendingRecordExplanations.get(recordId);
   }
 
   // --- Visits ---
