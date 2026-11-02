@@ -1,4 +1,6 @@
 import { Shield, ArrowLeft, LogOut } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useApp } from "../../context/AppContext";
 
 /**
  * DoctorHeader – shows the authenticated doctor's real identity.
@@ -6,6 +8,28 @@ import { Shield, ArrowLeft, LogOut } from "lucide-react";
  * Never imports from mockData.
  */
 export default function DoctorHeader({ onNavigateHome, doctorName, specialty, hospitalName }) {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { logout } = useApp();
+
+    const handleBack = () => {
+        if (location.pathname !== "/doctor") {
+            navigate("/doctor");
+        } else if (onNavigateHome) {
+            onNavigateHome();
+        } else {
+            navigate("/");
+        }
+    };
+
+    const handleLogout = () => {
+        logout();
+        if (onNavigateHome) {
+            onNavigateHome();
+        } else {
+            navigate("/");
+        }
+    };
     let displayName = doctorName || "Doctor";
     if (displayName !== "Doctor") {
         displayName = displayName
@@ -29,7 +53,7 @@ export default function DoctorHeader({ onNavigateHome, doctorName, specialty, ho
             <div className="w-full px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={onNavigateHome}
+                        onClick={handleBack}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-teal-700 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
@@ -63,7 +87,7 @@ export default function DoctorHeader({ onNavigateHome, doctorName, specialty, ho
                     </div>
 
                     <button
-                        onClick={onNavigateHome}
+                        onClick={handleLogout}
                         className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-xs font-bold transition-colors ml-2 py-1 px-1.5"
                     >
                         <LogOut className="w-3.5 h-3.5" />

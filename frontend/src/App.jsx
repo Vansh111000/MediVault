@@ -18,11 +18,54 @@ import Consultations from "./pages/doctor/Consultations";
 import Prescriptions from "./pages/doctor/Prescriptions";
 
 
+import { useApp } from "./context/AppContext";
+
+const RoleRoute = ({ allowedRoles, children }) => {
+    const { isAuthenticated, currentRole, authLoading } = useApp();
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+                <div className="w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    const normalizedRole = currentRole === "receptionist" ? "assistant" : currentRole;
+    if (!allowedRoles.includes(normalizedRole)) {
+        if (normalizedRole === "doctor") {
+            return <Navigate to="/doctor" replace />;
+        } else if (normalizedRole === "assistant") {
+            return <Navigate to="/assistant" replace />;
+        } else {
+            return <Navigate to="/patient" replace />;
+        }
+    }
+
+    return children;
+};
+
 const MainLayout = () => {
     const navigate = useNavigate();
+    const { isAuthenticated, currentRole, logout } = useApp();
     const [authMode, setAuthMode] = useState("login");
 
     const handleOpenAuth = (mode = "login", role = null) => {
+        if (isAuthenticated) {
+            const normalizedRole = currentRole === "receptionist" ? "assistant" : currentRole;
+            if (normalizedRole === "doctor") {
+                navigate("/doctor");
+            } else if (normalizedRole === "assistant") {
+                navigate("/assistant");
+            } else {
+                navigate("/patient");
+            }
+            return;
+        }
         setAuthMode(mode);
         if (role) {
             navigate(`/login?role=${role}`);
@@ -32,28 +75,54 @@ const MainLayout = () => {
     };
 
     const handleNavigateToPortal = () => {
-        navigate("/patient");
+        if (isAuthenticated) {
+            const normalizedRole = currentRole === "receptionist" ? "assistant" : currentRole;
+            if (normalizedRole === "doctor") navigate("/doctor");
+            else if (normalizedRole === "assistant") navigate("/assistant");
+            else navigate("/patient");
+        } else {
+            navigate("/login?role=patient");
+        }
     };
 
     const handleNavigateToDoctor = () => {
-        navigate("/doctor");
+        if (isAuthenticated) {
+            const normalizedRole = currentRole === "receptionist" ? "assistant" : currentRole;
+            if (normalizedRole === "doctor") navigate("/doctor");
+            else if (normalizedRole === "assistant") navigate("/assistant");
+            else navigate("/patient");
+        } else {
+            navigate("/login?role=doctor");
+        }
     };
 
     const handleNavigateToAssistant = () => {
-        navigate("/assistant");
+        if (isAuthenticated) {
+            const normalizedRole = currentRole === "receptionist" ? "assistant" : currentRole;
+            if (normalizedRole === "doctor") navigate("/doctor");
+            else if (normalizedRole === "assistant") navigate("/assistant");
+            else navigate("/patient");
+        } else {
+            navigate("/login?role=assistant");
+        }
     };
 
     const handleNavigateHome = () => {
         navigate("/");
     };
 
+    const handleLogout = () => {
+        logout();
+        navigate("/");
+    };
+
     const handleAuthSuccess = (role) => {
         if (role === "doctor") {
-            handleNavigateToDoctor();
+            navigate("/doctor", { replace: true });
         } else if (role === "receptionist" || role === "assistant") {
-            handleNavigateToAssistant();
+            navigate("/assistant", { replace: true });
         } else {
-            handleNavigateToPortal();
+            navigate("/patient", { replace: true });
         }
     };
 
@@ -75,20 +144,35 @@ const MainLayout = () => {
                 <Route
                     path="/login"
                     element={
-                        <AuthPage
-                            initialMode={authMode}
-                            onBack={handleNavigateHome}
-                            onAuthSuccess={handleAuthSuccess}
-                        />
+                        isAuthenticated ? (
+                            <Navigate
+                                to={
+                                    currentRole === "doctor"
+                                        ? "/doctor"
+                                        : currentRole === "receptionist" || currentRole === "assistant"
+                                        ? "/assistant"
+                                        : "/patient"
+                                }
+                                replace
+                            />
+                        ) : (
+                            <AuthPage
+                                initialMode={authMode}
+                                onBack={handleNavigateHome}
+                                onAuthSuccess={handleAuthSuccess}
+                            />
+                        )
                     }
                 />
 
                 <Route
                     path="/assistant"
                     element={
-                        <ReceptionistDashboard
-                            onNavigateHome={handleNavigateHome}
-                        />
+                        <RoleRoute allowedRoles={["assistant", "hospital_admin", "super_admin"]}>
+                            <ReceptionistDashboard
+                                onNavigateHome={handleNavigateHome}
+                            />
+                        </RoleRoute>
                     }
                 />
 
@@ -100,14 +184,24 @@ const MainLayout = () => {
                 <Route
                     path="/patient"
                     element={
-                        <PatientDashboard
-                            onLogout={handleNavigateHome}
-                            onNavigateToDoctor={handleNavigateToDoctor}
-                        />
+                        <RoleRoute allowedRoles={["patient"]}>
+                            <PatientDashboard
+                                onLogout={handleLogout}
+                                onNavigateHome={handleNavigateHome}
+                                onNavigateToDoctor={handleNavigateToDoctor}
+                            />
+                        </RoleRoute>
                     }
                 />
 
-                <Route path="/doctor" element={<DoctorLayout onNavigateHome={handleNavigateHome} />}>
+                <Route
+                    path="/doctor"
+                    element={
+                        <RoleRoute allowedRoles={["doctor"]}>
+                            <DoctorLayout onNavigateHome={handleNavigateHome} />
+                        </RoleRoute>
+                    }
+                >
                     <Route index element={<DoctorDashboard />} />
 
                     <Route path="patients/:patientId" element={<PatientWorkspace />}>

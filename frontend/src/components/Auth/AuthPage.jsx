@@ -96,25 +96,30 @@ export const AuthPage = ({ initialMode = 'login', onBack, onAuthSuccess }) => {
           return;
         }
 
-        if (!name || !email || !password) {
-          showToast('Validation Error', 'Please complete all required fields', 'error');
+        const trimmedName = (name || '').trim();
+        const trimmedEmail = (email || '').trim().toLowerCase();
+        const trimmedPassword = password || '';
+        const resolvedRole = (selectedRole === 'assistant' || selectedRole === 'receptionist') ? 'assistant' : 'doctor';
+
+        if (!trimmedName || !trimmedEmail || !trimmedPassword) {
+          showToast('Validation Error', 'Please complete all required fields (Name, Email, Password)', 'error');
           setLoading(false);
           return;
         }
 
         await registerStaff({
-          name,
-          email,
-          password,
-          role: selectedRole === 'receptionist' ? 'receptionist' : 'doctor',
+          name: trimmedName,
+          email: trimmedEmail,
+          password: trimmedPassword,
+          role: resolvedRole,
           hospitalId: selectedHospitalId || hospitals[0]?.id || hospitals[0]?._id,
-          specialty: selectedRole === 'doctor' ? doctorSpecialty : undefined,
-          licenseNumber: selectedRole === 'doctor' ? licenseNumber || `MED-${Math.floor(10000 + Math.random() * 90000)}` : undefined,
-          employeeId: selectedRole === 'receptionist' ? employeeId || `EMP-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
-          phone
+          specialty: resolvedRole === 'doctor' ? (doctorSpecialty || 'General Medicine') : undefined,
+          licenseNumber: resolvedRole === 'doctor' ? licenseNumber || `MED-${Math.floor(10000 + Math.random() * 90000)}` : undefined,
+          employeeId: resolvedRole === 'assistant' ? employeeId || `EMP-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+          phone: phone ? phone.trim() : undefined
         });
 
-        onAuthSuccess(selectedRole);
+        onAuthSuccess(resolvedRole);
       } else {
         // Login Flow (All roles)
         if (!email || !password) {

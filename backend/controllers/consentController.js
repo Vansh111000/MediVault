@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { Consent, Patient, Hospital } = require('../models');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { logAudit } = require('../utils/auditLogger');
@@ -170,6 +171,10 @@ const respondConsent = async (req, res, next) => {
 const revokeConsent = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return errorResponse(res, 404, 'Consent record not found.');
+    }
 
     const consent = await Consent.findById(id)
       .populate('patient')

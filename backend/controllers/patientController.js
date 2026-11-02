@@ -128,14 +128,14 @@ const createPatient = async (req, res, next) => {
       dob: dob ? new Date(dob) : undefined,
       age: age ? parseInt(age, 10) : undefined,
       gender: gender || 'Other',
-      bloodGroup: bloodGroup || 'O+',
+      bloodGroup: bloodGroup || '',
       phone: cleanPhone,
       email: email ? email.toLowerCase().trim() : '',
-      address: address || 'Standard Registered Residence',
+      address: address ? address.trim() : '',
       allergies: Array.isArray(allergies) ? allergies : allergies ? [{ allergen: allergies }] : [],
       chronicConditions: Array.isArray(chronicConditions) ? chronicConditions : chronicConditions ? [chronicConditions] : [],
       vitals: vitals || {},
-      emergencyContact: emergencyContact || { name: 'Family Contact', relation: 'Relative', phone: cleanPhone },
+      emergencyContact: (emergencyContact && emergencyContact.name && emergencyContact.name.trim()) ? emergencyContact : undefined,
       isClaimed: false,
       activationCodeHash,
       activationExpiresAt,
@@ -338,6 +338,10 @@ const getPatientMedicalHistory = async (req, res, next) => {
       return errorResponse(res, 404, 'Patient not found.');
     }
 
+    if (req.user.role === 'patient' && String(patient.user) !== String(req.user._id)) {
+      return errorResponse(res, 403, 'You can only access your own medical history.');
+    }
+
     const currentHospitalId = req.activeHospital?._id;
     const userRole = req.user.role;
     const userId = req.user._id;
@@ -357,6 +361,9 @@ const getPatientMedicalHistory = async (req, res, next) => {
 
     // Fetch consultations
     const consultFilter = { patient: patientId };
+    if (userRole === 'patient') {
+      consultFilter.status = 'completed';
+    }
     if (isAssistant && currentHospitalId) {
       consultFilter.hospital = currentHospitalId;
     }

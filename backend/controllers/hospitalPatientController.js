@@ -8,7 +8,10 @@ const { logAudit } = require('../utils/auditLogger');
  */
 const getHospitalPatients = async (req, res, next) => {
   try {
-    const hospitalId = req.activeHospital?._id || req.headers['x-hospital-id'] || req.query.hospitalId;
+    const isStaff = ['assistant', 'receptionist', 'doctor', 'hospital_admin'].includes(req.user?.role);
+    const hospitalId = (isStaff && req.activeHospital?._id)
+      ? req.activeHospital._id
+      : (req.activeHospital?._id || req.headers['x-hospital-id'] || req.query.hospitalId);
 
     if (!hospitalId) {
       return errorResponse(res, 400, 'Hospital identifier is required to view directory.');
@@ -80,7 +83,10 @@ const lookupPatientByExactMediVaultId = async (req, res, next) => {
     };
 
     // Check if already in current hospital's directory
-    const hospitalId = req.activeHospital?._id || req.headers['x-hospital-id'];
+    const isStaff = ['assistant', 'receptionist', 'doctor', 'hospital_admin'].includes(req.user?.role);
+    const hospitalId = (isStaff && req.activeHospital?._id)
+      ? req.activeHospital._id
+      : (req.activeHospital?._id || req.headers['x-hospital-id']);
     let alreadyInDirectory = false;
     if (hospitalId) {
       const existing = await HospitalPatient.findOne({
@@ -121,7 +127,10 @@ const lookupPatientByExactMediVaultId = async (req, res, next) => {
 const addPatientToHospitalDirectory = async (req, res, next) => {
   try {
     const { patientId, mediVaultId, operationalNotes } = req.body;
-    const hospitalId = req.body.hospitalId || req.activeHospital?._id || req.headers['x-hospital-id'];
+    const isStaff = ['assistant', 'receptionist', 'doctor', 'hospital_admin'].includes(req.user?.role);
+    const hospitalId = (isStaff && req.activeHospital?._id)
+      ? req.activeHospital._id
+      : (req.body.hospitalId || req.activeHospital?._id || req.headers['x-hospital-id']);
 
     if (!hospitalId) {
       return errorResponse(res, 400, 'Hospital identifier is required.');

@@ -14,6 +14,32 @@ import {
   INITIAL_NOTIFICATIONS
 } from '../data/mockData';
 
+const mapConsultationsToRecords = (consultations = [], patientId) => consultations
+  .filter((consultation) => consultation.status === 'completed')
+  .map((consultation) => ({
+    id: consultation._id || consultation.id,
+    patientId: String(consultation.patient?._id || consultation.patient?.id || consultation.patient || patientId || ''),
+    hospitalId: consultation.hospital?._id || consultation.hospital?.id || consultation.hospital,
+    hospitalName: consultation.hospital?.name || 'Hospital not recorded',
+    doctorId: consultation.doctor?._id || consultation.doctor?.id || consultation.doctor,
+    doctorName: consultation.doctor?.name || 'Doctor not recorded',
+    specialty: consultation.doctor?.specialty || 'General',
+    category: consultation.prescriptions?.length ? 'Prescription' : 'Consultation',
+    recordType: 'Clinical Consultation',
+    title: `Consultation at ${consultation.hospital?.name || 'Hospital'}`,
+    date: new Date(consultation.completedAt || consultation.createdAt || consultation.updatedAt).toLocaleDateString(),
+    summary: consultation.clinicalNote || 'No consultation note was recorded.',
+    clinicalNote: consultation.clinicalNote || '',
+    medications: (consultation.prescriptions || []).map((prescription) => ({
+      drug: prescription.name,
+      dosage: prescription.dosage,
+      frequency: prescription.frequency,
+      duration: prescription.duration,
+      instructions: prescription.instructions
+    })),
+    isImmutable: true
+  }));
+
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
@@ -101,19 +127,28 @@ export const AppProvider = ({ children }) => {
     patientName: c.patient?.name || 'Patient',
     requestingHospitalId: c.requestingHospital?._id || c.requestingHospital,
     requestingHospitalName: c.requestingHospital?.name || 'Medical Center',
+    hospitalName: c.requestingHospital?.name || 'Medical Center',
+    hospital: c.requestingHospital?.name || 'Medical Center',
     requestingDoctorName: c.requestingUser?.name || c.requestingUser?.email || 'Attending Physician',
+    doctorName: c.requestingUser?.name || c.requestingUser?.email || 'Attending Physician',
+    doctor: c.requestingUser?.name || c.requestingUser?.email || 'Attending Physician',
     purpose: c.purpose,
-    status: c.status === 'approved' ? 'APPROVED_ACTIVE' : c.status.toUpperCase(),
+    status: c.status === 'approved' ? 'Active' : c.status === 'revoked' ? 'Revoked' : c.status === 'expired' ? 'Expired' : 'Pending',
+    rawStatus: c.status,
     requestedAt: c.createdAt,
     grantedAt: c.grantedAt,
+    grantedDate: c.grantedAt ? new Date(c.grantedAt).toLocaleDateString() : (c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''),
     expiresAt: c.expiresAt,
     durationMinutes: c.durationMinutes || 240,
     permissionLevel: `${(c.durationMinutes || 240) / 60}-Hour Visit Access (${c.permissionScope || 'read_only_visit'})`
   });
 
   // Fetch Atlas Data on App Init
-  const loadBackendData = useCallback(async () => {
+  const loadBackendData = useCallback(async (forcedHospId = null, roleOverride = null) => {
     try {
+      const effectiveHospId = forcedHospId || api.activeHospitalId || activeHospitalId;
+      const loadRole = roleOverride || currentRole;
+      const canLoadHospitalLists = ['doctor', 'assistant', 'receptionist'].includes(loadRole) && Boolean(effectiveHospId);
       // 1. Fetch hospitals
       const hospRes = await api.getHospitals().catch(() => null);
       if (hospRes?.data && hospRes.data.length > 0) {
@@ -129,32 +164,36 @@ export const AppProvider = ({ children }) => {
           status: h.status
         }));
         setHospitals(mappedHospitals);
-        if (!activeHospitalId) {
+        // Only set default hospital for unauthenticated public viewers
+        if (!effectiveHospId && !api.token) {
           setActiveHospitalId(mappedHospitals[0].id);
         }
       }
 
       // 2. Fetch doctors scoped to authenticated hospital (backend enforces scoping)
-      const docRes = await api.getDoctors().catch(() => null);
-      if (docRes?.data && docRes.data.length > 0) {
-        const mappedDoctors = docRes.data.map(d => ({
-          id: d._id,
-          _id: d._id,
-          name: d.name,
-          specialty: d.specialty,
-          licenseNumber: d.licenseNumber,
-          email: d.email || d.user?.email,
-        }));
-        setDoctors(mappedDoctors);
-      } else if (docRes) {
-        // Clear stale mock doctors when backend returns empty
+      if (api.token && canLoadHospitalLists) {
+        const docRes = await api.getDoctors().catch(() => null);
+        if (docRes?.data && Array.isArray(docRes.data)) {
+          const mappedDoctors = docRes.data.map(d => ({
+            id: d._id,
+            _id: d._id,
+            name: d.name,
+            specialty: d.specialty,
+            licenseNumber: d.licenseNumber,
+            email: d.email || d.user?.email,
+          }));
+          setDoctors(mappedDoctors);
+        } else {
+          setDoctors([]);
+        }
+      } else {
         setDoctors([]);
       }
 
       // 3. Fetch patients: prioritize hospital-specific directory for staff
-      if (api.token) {
+      if (api.token && canLoadHospitalLists) {
         const hospPatRes = await api.getHospitalPatients().catch(() => null);
-        if (hospPatRes?.data && Array.isArray(hospPatRes.data) && hospPatRes.data.length > 0) {
+        if (hospPatRes?.data && Array.isArray(hospPatRes.data)) {
           const mappedFromDir = hospPatRes.data
             .filter(entry => entry.patient)
             .map(entry => {
@@ -164,7 +203,7 @@ export const AppProvider = ({ children }) => {
                 _id: p._id,
                 mediVaultId: p.mediVaultId,
                 name: p.name,
-                age: p.age || 30,
+                age: p.age,
                 gender: p.gender,
                 bloodGroup: p.bloodGroup,
                 phone: p.phone,
@@ -174,6 +213,7 @@ export const AppProvider = ({ children }) => {
                 chronicConditions: p.chronicConditions || [],
                 vitals: p.vitals || {},
                 isClaimed: p.isClaimed,
+                status: p.isClaimed ? 'Activated' : 'Unclaimed',
                 dateAdded: entry.dateAdded,
                 lastVisitAt: entry.lastVisitAt,
                 directoryStatus: entry.status
@@ -181,62 +221,30 @@ export const AppProvider = ({ children }) => {
             });
           setPatients(mappedFromDir);
         } else {
-          const patRes = await api.searchPatients('').catch(() => null);
-          if (patRes?.data && patRes.data.length > 0) {
-            setPatients(patRes.data.map(p => ({
-              id: p._id,
-              _id: p._id,
-              mediVaultId: p.mediVaultId,
-              name: p.name,
-              age: p.age || 30,
-              gender: p.gender,
-              bloodGroup: p.bloodGroup,
-              phone: p.phone,
-              email: p.email,
-              address: p.address,
-              allergies: p.allergies || [],
-              chronicConditions: p.chronicConditions || [],
-              vitals: p.vitals || {},
-              isClaimed: p.isClaimed
-            })));
-          }
+          setPatients([]);
         }
-      } else {
-        const patRes = await api.searchPatients('').catch(() => null);
-        if (patRes?.data && patRes.data.length > 0) {
-          setPatients(patRes.data.map(p => ({
-            id: p._id,
-            _id: p._id,
-            mediVaultId: p.mediVaultId,
-            name: p.name,
-            age: p.age || 30,
-            gender: p.gender,
-            bloodGroup: p.bloodGroup,
-            phone: p.phone,
-            email: p.email,
-            address: p.address,
-            allergies: p.allergies || [],
-            chronicConditions: p.chronicConditions || [],
-            vitals: p.vitals || {},
-            isClaimed: p.isClaimed
-          })));
-        }
+      } else if (!api.token) {
+        setPatients([]);
       }
 
       // 4. Fetch visits if token exists
       if (api.token) {
         const visitRes = await api.getVisits().catch(() => null);
-        if (visitRes?.data && visitRes.data.length > 0) {
+        if (visitRes?.data && Array.isArray(visitRes.data)) {
           setActiveVisits(visitRes.data.map(mapVisitToFrontend));
+        } else {
+          setActiveVisits([]);
         }
 
         const consentRes = await api.getPatientConsents().catch(() => null);
-        if (consentRes?.data && consentRes.data.length > 0) {
+        if (consentRes?.data && Array.isArray(consentRes.data)) {
           setConsentRequests(consentRes.data.map(mapConsentToFrontend));
+        } else {
+          setConsentRequests([]);
         }
 
         const auditRes = await api.getAuditLogs().catch(() => null);
-        if (auditRes?.data && auditRes.data.length > 0) {
+        if (auditRes?.data && Array.isArray(auditRes.data)) {
           setAuditLogs(auditRes.data.map(a => ({
             id: a._id,
             timestamp: a.timestamp,
@@ -248,17 +256,21 @@ export const AppProvider = ({ children }) => {
             recordId: a.resourceId,
             details: a.details
           })));
+        } else {
+          setAuditLogs([]);
         }
       }
     } catch (err) {
       console.warn('Initial Atlas data load fallback:', err.message);
     }
-  }, [activeHospitalId]);
+  }, [activeHospitalId, currentRole]);
 
   // Initial Auth Check
   useEffect(() => {
     const initAuth = async () => {
       setAuthLoading(true);
+      let resolvedHospId = null;
+      let resolvedRole = currentRole;
       if (api.token) {
         try {
           const res = await api.getMe();
@@ -266,12 +278,34 @@ export const AppProvider = ({ children }) => {
             const u = res.data.user;
             setCurrentUser(u);
             const mappedRole = u.role === 'receptionist' ? 'assistant' : u.role;
+            resolvedRole = mappedRole;
             setCurrentRole(mappedRole);
             setIsAuthenticated(true);
 
-            if (res.data.activeHospital) {
-              setActiveHospitalId(res.data.activeHospital._id || res.data.activeHospital);
-              setAuthenticatedHospital(res.data.activeHospital);
+            let hosp = res.data.activeHospital || res.data.memberships?.[0]?.hospital || null;
+            // resolvedHospId assigned below
+            if (hosp) {
+              resolvedHospId = hosp._id || hosp.id || hosp;
+              setActiveHospitalId(resolvedHospId);
+              setAuthenticatedHospital(hosp);
+              api.setActiveHospitalId(resolvedHospId);
+            }
+
+            if (u.patientProfile) {
+              const patObj = typeof u.patientProfile === 'object' ? u.patientProfile : null;
+              if (patObj) {
+                const patId = patObj._id || patObj.id;
+                setActivePatientId(patId);
+                setPatients(prev => {
+                  const exists = prev.some(p => (p.id === patId || p._id === patId));
+                  return exists ? prev : [{ id: patId, _id: patId, ...patObj }, ...prev];
+                });
+                try {
+                  api.getPatientMedicalHistory(patId).then(hist => {
+                    if (hist?.data?.consultations) setRecords(mapConsultationsToRecords(hist.data.consultations, patId));
+                  }).catch(() => {});
+                } catch (_) {}
+              }
             }
 
             if (u.assistantProfile) {
@@ -298,7 +332,7 @@ export const AppProvider = ({ children }) => {
           api.logout();
         }
       }
-      await loadBackendData();
+      await loadBackendData(resolvedHospId, resolvedRole);
       setAuthLoading(false);
     };
 
@@ -306,8 +340,12 @@ export const AppProvider = ({ children }) => {
   }, [loadBackendData]);
 
   // Derived active entity objects (strictly from live backend, no mock fallbacks)
-  const currentHospital = authenticatedHospital || hospitals.find((h) => h.id === activeHospitalId || h._id === activeHospitalId) || hospitals[0] || null;
-  const currentPatient = patients.find((p) => p.id === activePatientId || p._id === activePatientId || p.mediVaultId === activePatientId) || patients[0] || null;
+  const currentHospital = authenticatedHospital || hospitals.find((h) => h.id === activeHospitalId || h._id === activeHospitalId) || (['patient', 'super_admin'].includes(currentRole) ? hospitals[0] : null);
+  const currentPatient =
+    (currentUser?.patientProfile && typeof currentUser.patientProfile === 'object' ? { id: currentUser.patientProfile._id, _id: currentUser.patientProfile._id, ...currentUser.patientProfile } : null) ||
+    patients.find((p) => p.id === activePatientId || p._id === activePatientId || p.mediVaultId === activePatientId) ||
+    patients[0] ||
+    null;
   const currentDoctor = authenticatedDoctorProfile || doctors.find((d) => d.id === activeDoctorId || d._id === activeDoctorId) || doctors[0] || null;
   const currentAssistant = authenticatedAssistantProfile || null;
 
@@ -333,14 +371,30 @@ export const AppProvider = ({ children }) => {
         setCurrentRole(mappedRole);
         setIsAuthenticated(true);
 
-        if (res.data.memberships?.[0]?.hospital) {
-          const hospId = res.data.memberships[0].hospital._id || res.data.memberships[0].hospital;
+        let hosp = res.data.activeHospital || res.data.memberships?.[0]?.hospital || null;
+        let hospId = null;
+        if (hosp) {
+          hospId = hosp._id || hosp.id || hosp;
           setActiveHospitalId(hospId);
-          setAuthenticatedHospital(res.data.memberships[0].hospital);
+          setAuthenticatedHospital(hosp);
+          api.setActiveHospitalId(hospId);
         }
 
         if (u.patientProfile) {
-          setActivePatientId(u.patientProfile._id || u.patientProfile);
+          const patObj = typeof u.patientProfile === 'object' ? u.patientProfile : null;
+          if (patObj) {
+            const patId = patObj._id || patObj.id;
+            setActivePatientId(patId);
+            setPatients(prev => {
+              const exists = prev.some(p => (p.id === patId || p._id === patId));
+              return exists ? prev : [{ id: patId, _id: patId, ...patObj }, ...prev];
+            });
+            try {
+              api.getPatientMedicalHistory(patId).then(hist => {
+                if (hist?.data?.consultations) setRecords(mapConsultationsToRecords(hist.data.consultations, patId));
+              }).catch(() => {});
+            } catch (_) {}
+          }
         }
         if (u.doctorProfile) {
           setActiveDoctorId(u.doctorProfile._id || u.doctorProfile);
@@ -364,7 +418,7 @@ export const AppProvider = ({ children }) => {
           } catch (_) {}
         }
 
-        await loadBackendData();
+        await loadBackendData(hospId, mappedRole);
         showToast('Signed In', `Welcome back, ${u.email}!`, 'success');
         return { success: true, role: u.role };
       }
@@ -406,11 +460,19 @@ export const AppProvider = ({ children }) => {
         const mappedRole = u.role === 'receptionist' ? 'assistant' : u.role;
         setCurrentRole(mappedRole);
         setIsAuthenticated(true);
+        let hosp = res.data.activeHospital || res.data.memberships?.[0]?.hospital || null;
+        let hospId = null;
+        if (hosp) {
+          hospId = hosp._id || hosp.id || hosp;
+          setActiveHospitalId(hospId);
+          setAuthenticatedHospital(hosp);
+          api.setActiveHospitalId(hospId);
+        }
         if (u.assistantProfile) {
           setAuthenticatedAssistantProfile(u.assistantProfile);
           setActiveAssistantId(u.assistantProfile._id || u.assistantProfile.id);
         }
-        await loadBackendData();
+        await loadBackendData(hospId);
         showToast('Registration Successful', `Welcome to MediVault, ${staffData.name}!`, 'success');
         return res.data;
       }
@@ -518,7 +580,7 @@ export const AppProvider = ({ children }) => {
     preliminaryVitals = {}
   }) => {
     try {
-      // Build doctor list from what was explicitly passed – no mock fallback
+      // Build doctor list from what was explicitly passed ΓÇô no mock fallback
       const docList = assignedDoctorIds && assignedDoctorIds.length > 0
         ? assignedDoctorIds
         : (doctorId ? [doctorId] : []);
@@ -527,7 +589,7 @@ export const AppProvider = ({ children }) => {
 
       const payload = {
         patientId,
-        // hospitalId intentionally omitted here – backend derives it from authenticated membership
+        // hospitalId intentionally omitted here ΓÇô backend derives it from authenticated membership
         ...(docList[0] && { doctorId: docList[0] }),
         assignedDoctorIds: docList,
         appointmentDate,
@@ -830,7 +892,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Check Cross-Hospital Record Access against Consent
-  const hasAccessToRecord = (record, requestingHospitalId = currentHospital.id, patientId = record.patientId) => {
+  const hasAccessToRecord = (record, requestingHospitalId = currentHospital?.id, patientId = record.patientId) => {
     if (record.hospitalId === requestingHospitalId) return true;
     if (currentRole === 'patient') return true;
 
@@ -838,7 +900,7 @@ export const AppProvider = ({ children }) => {
       (c) =>
         c.patientId === patientId &&
         (c.requestingHospitalId === requestingHospitalId || String(c.requestingHospitalId) === String(requestingHospitalId)) &&
-        c.status === 'APPROVED_ACTIVE'
+        c.rawStatus === 'approved'
     );
     return !!activeConsent;
   };

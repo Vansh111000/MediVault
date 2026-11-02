@@ -43,30 +43,30 @@ const patientSchema = new mongoose.Schema({
   },
   address: {
     type: String,
-    default: 'Standard Registered Residence'
+    default: ''
   },
   allergies: [{
     allergen: { type: String, trim: true },
-    reaction: { type: String, default: 'Moderate' },
-    severity: { type: String, default: 'Mild' }
+    reaction: { type: String, default: '' },
+    severity: { type: String, default: '' }
   }],
   chronicConditions: [{
     type: String,
     trim: true
   }],
   vitals: {
-    bp: { type: String, default: '120/80 mmHg' },
-    heartRate: { type: String, default: '72 bpm' },
-    spO2: { type: String, default: '98%' },
-    weight: { type: String, default: '70 kg' },
-    height: { type: String, default: '172 cm' },
-    bmi: { type: String, default: '23.6' },
-    bloodGlucose: { type: String, default: '95 mg/dL' },
-    temp: { type: String, default: '98.6 °F' }
+    bp: { type: String },
+    heartRate: { type: String },
+    spO2: { type: String },
+    weight: { type: String },
+    height: { type: String },
+    bmi: { type: String },
+    bloodGlucose: { type: String },
+    temp: { type: String }
   },
   emergencyContact: {
-    name: { type: String, default: 'Family Contact' },
-    relation: { type: String, default: 'Relative' },
+    name: { type: String },
+    relation: { type: String },
     phone: { type: String }
   },
   isClaimed: {

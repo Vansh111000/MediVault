@@ -397,7 +397,13 @@ export const ReceptionistDashboard = ({ onNavigateHome }) => {
         <div className="w-full px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={handleLogout}
+              onClick={() => {
+                if (activeTab !== 'list') {
+                  setActiveTab('list');
+                } else if (onNavigateHome) {
+                  onNavigateHome();
+                }
+              }}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-teal-700 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
