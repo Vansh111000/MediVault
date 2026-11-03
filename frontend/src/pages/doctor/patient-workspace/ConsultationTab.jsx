@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import Icon from "../../../components/Icon";
 import { useApp } from "../../../context/AppContext";
@@ -177,6 +177,8 @@ export default function ConsultationTab() {
     const [completing, setCompleting] = useState(false);
     const [amendments, setAmendments] = useState(initialConsultation?.amendments || []);
     const [fontSize, setFontSize] = useState(16);
+    const [scanningLetterhead, setScanningLetterhead] = useState(false);
+    const letterheadInputRef = useRef(null);
 
     // Sync amendments if initialConsultation updates
     useEffect(() => {
@@ -189,6 +191,44 @@ export default function ConsultationTab() {
 
     const handleFontIncrease = () => setFontSize((prev) => Math.min(MAX_FONT, prev + 1));
     const handleFontDecrease = () => setFontSize((prev) => Math.max(MIN_FONT, prev - 1));
+
+    const handleLetterheadImage = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+            showToast("Unsupported Image", "Choose a JPEG, PNG, or WebP image.", "error");
+            return;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+            showToast("Image Too Large", "Choose an image smaller than 4 MB.", "error");
+            return;
+        }
+
+        setScanningLetterhead(true);
+        try {
+            const image = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result).split(",")[1]);
+                reader.onerror = () => reject(new Error("Could not read the selected image."));
+                reader.readAsDataURL(file);
+            });
+            const response = await api.extractLetterheadText(image, file.type);
+            const extractedText = response?.data?.text?.trim();
+            if (!extractedText) throw new Error("No readable text was found. Try a clearer image.");
+            setForm((previous) => ({
+                ...previous,
+                clinicalNote: previous.clinicalNote?.trim()
+                    ? `${previous.clinicalNote.trim()}\n\n${extractedText}`
+                    : extractedText,
+            }));
+            showToast("Text Added", "Review the extracted note carefully before saving or signing.", "success");
+        } catch (error) {
+            showToast("Text Extraction Failed", error.message || "Could not read the letterhead image.", "error");
+        } finally {
+            setScanningLetterhead(false);
+        }
+    };
 
     const handleSaveDraft = async () => {
         setSavingDraft(true);
@@ -356,6 +396,30 @@ export default function ConsultationTab() {
                                         A<sup>+</sup>
                                     </button>
                                 </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-100 bg-teal-50/70 px-3.5 py-3">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-800">Import a handwritten or printed note</p>
+                                    <p className="mt-0.5 text-[11px] text-slate-500">Image is sent to Gemini for transcription. Review all extracted text.</p>
+                                </div>
+                                <input
+                                    ref={letterheadInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    capture="environment"
+                                    className="hidden"
+                                    onChange={handleLetterheadImage}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => letterheadInputRef.current?.click()}
+                                    disabled={scanningLetterhead}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-800 disabled:cursor-wait disabled:opacity-60"
+                                >
+                                    <Icon className="text-[16px]">{scanningLetterhead ? "progress_activity" : "document_scanner"}</Icon>
+                                    {scanningLetterhead ? "Transcribing..." : "Upload / Take Photo"}
+                                </button>
                             </div>
 
                             <textarea

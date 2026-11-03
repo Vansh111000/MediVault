@@ -242,6 +242,13 @@ class ApiService {
   }
 
   // --- Consultations ---
+  async extractLetterheadText(image, mimeType) {
+    return this.request('/consultations/letterhead-ocr', {
+      method: 'POST',
+      body: { image, mimeType }
+    });
+  }
+
   async saveConsultationDraft(draftData) {
     return this.request('/consultations/draft', {
       method: 'POST',
